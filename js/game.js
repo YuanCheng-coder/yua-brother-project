@@ -349,7 +349,10 @@ export class Game {
     // Weapon firing
     for (const w of this.player.weapons) {
       const shots = w.update(dt, this.player);
-      if (shots) this.projectiles.push(...shots);
+      if (shots) {
+        this.projectiles.push(...shots);
+        this.muzzleFlashes = (this.muzzleFlashes || []).concat(shots.filter(s => s.type === 'projectile').map(s => ({ x: s.x, y: s.y, angle: Math.atan2(s.vy, s.vx), life: 0.08 })));
+      }
     }
 
     // Update enemies（收集敌方子弹）

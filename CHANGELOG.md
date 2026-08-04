@@ -2,6 +2,9 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v010 (2026-08-05)
+- muzzle flash trail on shots
+
 ## v009 (2026-08-05)
 - combo kill counter juice
 
