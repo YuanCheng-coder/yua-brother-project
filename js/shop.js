@@ -17,7 +17,7 @@ export class Shop {
   }
 
   _fillItems(player, wave) {
-    const itemCount = 5;
+    const itemCount = wave >= 8 ? 6 : 5;
     const pool = [];
     const weaponIds = Object.keys(WEAPON_DEFS);
 
