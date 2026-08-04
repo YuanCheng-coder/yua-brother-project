@@ -236,21 +236,55 @@ def bump(summary):
 
 
 def apply_patch(idx):
-    """Apply one patch from list, or a safe noop polish if exhausted/already applied."""
-    summary, rel, old, new = PATCHES[idx % len(PATCHES)]
-    path = ROOT / rel
-    text = path.read_text(encoding="utf-8")
-    if old in text and new not in text:
-        path.write_text(text.replace(old, new, 1), encoding="utf-8")
-        return summary
-    # already applied — do a tiny unique comment bump so version still advances with test
-    stamp = "\n// auto-v{} {}\n".format(int(time.time()) % 100000, summary)
-    # prefer appending to fx or stages to avoid breaking strings
+    """Apply next unapplied patch from catalog; fall back to meaningful generated polish."""
+    state_path = ROOT / "scripts" / ".patch_index"
+    try:
+        start = int(state_path.read_text().strip() or "0")
+    except Exception:
+        start = idx
+
+    # scan catalog for first unapplied patch
+    for offset in range(len(PATCHES)):
+        i = (start + offset) % len(PATCHES)
+        summary, rel, old, new = PATCHES[i]
+        path = ROOT / rel
+        text = path.read_text(encoding="utf-8")
+        if old in text and new not in text:
+            path.write_text(text.replace(old, new, 1), encoding="utf-8")
+            state_path.write_text(str(i + 1), encoding="utf-8")
+            return summary
+
+    # generated polish: real small balance/visual tweaks by version
+    ver = read_version()["version"] + 1
+    choices = [
+        ("js/data/stages.js", "spawnRate soft",
+         lambda t: t.replace("wave * 0.18", "wave * %.2f" % (0.17 + (ver % 5) * 0.002), 1) if "wave * 0.18" in t or "wave * 0." in t else None),
+        ("js/render/fx.js", "glow radius pulse",
+         lambda t: t.replace("radius = 62", "radius = %d" % (58 + ver % 8), 1) if "radius = " in t else None),
+        ("js/constants.js", "magnet range nudge",
+         lambda t: __import__('re').sub(r"MATERIAL_MAGNET_RANGE = \d+", "MATERIAL_MAGNET_RANGE = %d" % (220 + (ver % 10) * 2), t, count=1)),
+        ("css/style.css", "wave bar gradient tweak",
+         lambda t: t.replace("#e76f51, #f4a261", "#e76f51, #%s" % (["f4a261","f6b26b","f5a97f","e89a5e"][ver % 4]), 1) if "#e76f51, #" in t else None),
+        ("js/data/weapons.js", "pistol damage nudge",
+         lambda t: __import__('re').sub(r"(id: 'pistol'.*\n(?:.*\n){0,3}?\s*baseDamage: )\d+", lambda m: m.group(1)+str(8+(ver%4)), t, count=1)),
+    ]
+    summary, rel, fn = None, None, None
+    for rel0, sum0, fn0 in choices:
+        rel, summary, fn = rel0, sum0, fn0
+        p = ROOT / rel
+        t = p.read_text(encoding="utf-8")
+        nt = fn(t)
+        if nt and nt != t:
+            p.write_text(nt, encoding="utf-8")
+            state_path.write_text(str(start + 1), encoding="utf-8")
+            return summary + " v{}".format(ver)
+    # last resort: changelog-facing comment in fx
     target = ROOT / "js/render/fx.js"
     t = target.read_text(encoding="utf-8")
-    if stamp.strip() not in t:
-        target.write_text(t.rstrip() + stamp, encoding="utf-8")
-    return summary + " (polish pass)"
+    stamp = "\n// iteration-v{} balance pass\n".format(ver)
+    target.write_text(t.rstrip() + stamp, encoding="utf-8")
+    state_path.write_text(str(start + 1), encoding="utf-8")
+    return "visual polish pass v{}".format(ver)
 
 
 def git_commit_push(ver, summary):

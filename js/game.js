@@ -235,6 +235,8 @@ export class Game {
       spawnParticles(this.particles, e.x, e.y, e.type.color, 6);
       this.player.kills++;
       this.totalKills++;
+      this.combo = (this.combo || 0) + 1;
+      this.comboTimer = 2.5;
     }
     this.enemies = [];
     this.enemyProjectiles = [];
