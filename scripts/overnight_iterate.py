@@ -66,7 +66,11 @@ PATCHES = [
 
 
 def run(cmd, cwd=None, check=False):
-    return subprocess.run(cmd, cwd=cwd or str(ROOT), shell=True, capture_output=True, text=True)
+    return subprocess.run(
+        cmd, cwd=cwd or str(ROOT), shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
 
 
 def ensure_server():
