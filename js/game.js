@@ -366,6 +366,16 @@ export class Game {
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 28);
     }
+    if ((this.impactZoom || 0) > 0) {
+      this.impactZoom = Math.max(0, this.impactZoom - dt * 0.25);
+    }
+    if ((this.chapterBanner || 0) > 0) this.chapterBanner -= dt;
+    if ((this.comboTimer || 0) > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0) this.combo = 0;
+    }
+    for (const m of (this.muzzleFlashes || [])) m.life -= dt;
+    this.muzzleFlashes = (this.muzzleFlashes || []).filter(m => m.life > 0);
     if (this.hurtVignette > 0) {
       this.hurtVignette = Math.max(0, this.hurtVignette - dt * 1.8);
     }
@@ -495,11 +505,17 @@ export class Game {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     ctx.save();
-    // 轻微屏幕抖动
+    // 轻微屏幕抖动 + 受击冲击缩放
     if (this.shake > 0.2) {
       const sx = (Math.random() - 0.5) * this.shake * 2;
       const sy = (Math.random() - 0.5) * this.shake * 2;
       ctx.translate(sx, sy);
+    }
+    if ((this.impactZoom || 0) > 0.001) {
+      const z = 1 + this.impactZoom;
+      ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.scale(z, z);
+      ctx.translate(-CANVAS_WIDTH / 2, -CANVAS_HEIGHT / 2);
     }
 
     const theme = this.chapter?.theme || { bg0: '#1a1a30', bg1: '#0d0d18', accent: '#f4a261', ambient: '#fff' };
@@ -601,6 +617,30 @@ export class Game {
       vg.addColorStop(1, `rgba(180,20,40,${a})`);
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+
+    // 章节横幅
+    if ((this.chapterBanner || 0) > 0 && this.chapter) {
+      const a = Math.min(1, this.chapterBanner);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, CANVAS_HEIGHT * 0.38, CANVAS_WIDTH, 70);
+      ctx.fillStyle = this.chapter.theme?.accent || '#f4a261';
+      ctx.font = 'bold 28px Segoe UI, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${this.chapter.emoji} ${this.chapter.name}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.38 + 44);
+      ctx.restore();
+    }
+
+    // 连击提示
+    if ((this.combo || 0) >= 3) {
+      ctx.save();
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 20px Segoe UI, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`COMBO x${this.combo}`, 24, 86);
+      ctx.restore();
     }
 
     // 收钱阶段提示

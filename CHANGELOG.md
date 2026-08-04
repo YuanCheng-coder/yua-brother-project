@@ -2,6 +2,9 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v004 (2026-08-05)
+- Wire impact zoom, chapter banner, combo HUD
+
 ## v003 (2026-08-05)
 - camera impact zoom on hit (polish pass)
 
