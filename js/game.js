@@ -366,6 +366,22 @@ export class Game {
       return;
     }
     this.state = GameState.PLAYING;
+    // Daily streak: consecutive calendar days -> starting materials
+    try {
+      const key = 'yua_daily_streak';
+      const today = new Date().toISOString().slice(0, 10);
+      const prev = JSON.parse(localStorage.getItem(key) || '{}');
+      let streak = 1;
+      if (prev.day) {
+        const d0 = new Date(prev.day), d1 = new Date(today);
+        const diff = Math.round((d1 - d0) / 86400000);
+        streak = diff === 1 ? (prev.streak || 1) + 1 : (diff === 0 ? (prev.streak || 1) : 1);
+      }
+      localStorage.setItem(key, JSON.stringify({ day: today, streak }));
+      this.dailyStreak = streak;
+      this.player.materials += Math.min(20, streak * 2);
+      this.streakBanner = 2.5;
+    } catch (e) { this.dailyStreak = 1; }
     this._startWave();
   }
 
