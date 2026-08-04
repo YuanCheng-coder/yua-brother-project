@@ -2,6 +2,9 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v007 (2026-08-05)
+- camera impact zoom on hit (polish pass)
+
 ## v006 (2026-08-05)
 - camera impact zoom on hit (polish pass)
 
