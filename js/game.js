@@ -232,6 +232,7 @@ export class Game {
     this._eventPortalAt = this.isBossWave ? -1 : 2.5;
     this._eventCrateAt = this.isBossWave ? -1 : 2.8;
     this._eventCrate2At = this.isBossWave ? -1 : 7.0;
+    this._eventCrate3At = this.isBossWave ? -1 : 11.0;
     this._waveElapsed = 0;
   }
 
@@ -455,6 +456,10 @@ export class Game {
         }
         if (this._eventCrate2At > 0 && this._waveElapsed >= this._eventCrate2At) {
           this._eventCrate2At = -1;
+          maybeSpawnCrate(this);
+        }
+        if (this._eventCrate3At > 0 && this._waveElapsed >= this._eventCrate3At) {
+          this._eventCrate3At = -1;
           maybeSpawnCrate(this);
         }
         this._trySpawn(worldDt);
