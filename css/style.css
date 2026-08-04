@@ -381,3 +381,17 @@ kbd {
   }
   h1 { font-size: 2rem; }
 }
+
+.version-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #2a2a3e;
+  border: 1px solid #f4a261;
+  color: #f4a261;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.char-list { max-width: 900px; max-height: 280px; overflow-y: auto; }

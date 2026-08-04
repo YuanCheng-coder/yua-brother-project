@@ -26,7 +26,13 @@ export class Player {
     this.armor = s.armor || 0;
     this.luck = s.luck || 0;
     this.regen = 0;
-    this.lifesteal = 0;
+    this.lifesteal = s.lifesteal || 0;
+    this.crit = s.crit || 0;
+    this.materialGain = s.materialGain || 1;
+    this.elementalMod = s.elemental || 1;
+    this.iFramesMult = s.iFrames || 1;
+    this.berserk = !!s.berserk;
+    this.terrainSpeed = 1;
 
     this.weapons = [];
     this.materials = 0;
@@ -37,7 +43,7 @@ export class Player {
     this.regenTimer = 0;
   }
 
-  get speed() { return this.baseSpeed * this.speedMod; }
+  get speed() { return this.baseSpeed * this.speedMod * (this.terrainSpeed || 1); }
 
   addWeapon(weaponId, tier = 1) {
     const existing = this.weapons.find(w => w.id === weaponId && w.tier === tier);
@@ -55,7 +61,7 @@ export class Player {
     if (this.invincible > 0) return 0;
     const reduced = Math.max(1, amount - this.armor * 0.5);
     this.hp -= reduced;
-    this.invincible = 0.35;
+    this.invincible = 0.35 * this.iFramesMult;
     this.hitFeedback = { amount: reduced, x: this.x, y: this.y };
     return reduced;
   }
@@ -141,15 +147,29 @@ export function createWeapon(weaponId, tier = 1) {
     tier,
     def,
     cooldown: 0,
-    get damage() { return def.baseDamage * mult; },
-    get range() { return def.range * (1 + (tier - 1) * 0.1); },
-    get cd() { return def.cooldown / mult; },
+    upgradeLevel: 0,
+    enchants: [],
+    enchantMods: { damage: 1, attackSpeed: 1, pierce: 0, crit: 0, lifesteal: 0 },
+    get damage() {
+      const up = (def.upgrade?.damage || 0) * this.upgradeLevel;
+      return (def.baseDamage + up) * mult * (this.enchantMods.damage || 1);
+    },
+    get range() {
+      const up = (def.upgrade?.range || 0) * this.upgradeLevel;
+      return (def.range + up) * (1 + (tier - 1) * 0.1);
+    },
+    get cd() {
+      const up = (def.upgrade?.cooldown || 0) * this.upgradeLevel;
+      return Math.max(0.05, (def.cooldown + up) / mult / (this.enchantMods.attackSpeed || 1));
+    },
+    upgrade() {
+      this.upgradeLevel += 1;
+    },
     update(dt, player) {
       this.cooldown = Math.max(0, this.cooldown - dt);
       if (this.cooldown > 0) return null;
 
       const range = this.range * player.rangeMod;
-      // 优先攻击射程内最近敌人（计入敌人半径，避免“贴脸不打”）
       const target = findNearestEnemyInRange(player, range);
       if (!target) return null;
 
@@ -186,7 +206,13 @@ export function angleDiff(a, b) {
 function fireWeapon(weapon, player, target) {
   const def = weapon.def;
   const dmgMod = def.type === 'melee' ? player.meleeDamageMod : player.rangedDamageMod;
-  const damage = weapon.damage * player.damageMod * dmgMod;
+  let damage = weapon.damage * player.damageMod * dmgMod;
+  if (def.tags?.includes('magic') || def.tags?.includes('elemental')) {
+    damage *= player.elementalMod || 1;
+  }
+  if (player.berserk && player.hp < player.maxHp * 0.4) damage *= 1.25;
+  const critChance = (player.crit || 0) + (weapon.enchantMods?.crit || 0);
+  if (Math.random() < critChance) damage *= 1.75;
   const angle = Math.atan2(target.y - player.y, target.x - player.x);
   const targetDist = dist(player.x, player.y, target.x, target.y);
   const touchDist = player.radius + target.radius + 10;
@@ -254,29 +280,31 @@ function createProjectile(player, angle, damage, def, weapon) {
     vx: Math.cos(angle) * def.projectileSpeed,
     vy: Math.sin(angle) * def.projectileSpeed,
     damage,
-    pierce: def.pierce || 0,
+    pierce: (def.pierce || 0) + (weapon.enchantMods?.pierce || 0),
     homing: def.homing || false,
     life,
     maxLife: life,
     radius: def.id === 'sniper' ? 5 : 4,
-    color: weapon.tier >= 3 ? '#60a5fa' : weapon.tier >= 2 ? '#4ade80' : '#f4a261',
+    color: weapon.enchants?.includes('flame') ? '#f97316'
+      : weapon.enchants?.includes('frost') ? '#38bdf8'
+      : weapon.tier >= 3 ? '#60a5fa' : weapon.tier >= 2 ? '#4ade80' : '#f4a261',
     hitEnemies: new Set(),
+    lifestealBonus: weapon.enchantMods?.lifesteal || 0,
   };
 }
 
 export class Enemy {
-  constructor(type, wave, x, y) {
+  constructor(type, wave, x, y, powerScale = 1) {
     this.type = type;
     this.x = x;
     this.y = y;
     this.dead = false;
-    const scale = 1 + (wave - 1) * 0.12;
+    const scale = powerScale || (1 + (wave - 1) * 0.035);
     const eliteMult = type.isMiniBoss ? 1.15 : type.isBoss ? 1.25 : 1;
     this.maxHp = Math.floor(type.baseHp * scale * eliteMult);
     this.hp = this.maxHp;
-    // 波次加速封顶，避免后期快到无法走位
-    this.speed = type.speed * (1 + Math.min(wave - 1, 12) * 0.018);
-    this.damage = Math.floor(type.damage * (1 + (wave - 1) * 0.08));
+    this.speed = type.speed * (1 + Math.min(wave - 1, 12) * 0.015);
+    this.damage = Math.floor(type.damage * (0.95 + scale * 0.08));
     this.radius = type.radius || (type.isBoss ? 36 : type.isMiniBoss ? 28 : 14);
     this.hitFlash = 0;
     this.wobble = Math.random() * Math.PI * 2;

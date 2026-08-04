@@ -3,39 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>土豆兄弟 - Potato Survivor</title>
+  <title>Yua Brother — 土豆兄弟</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="app">
     <canvas id="gameCanvas" tabindex="0"></canvas>
 
-    <!-- 主菜单 -->
     <div id="menuScreen" class="screen">
-      <h1>🥔 土豆兄弟</h1>
-      <p class="subtitle">Potato Survivor</p>
-      <p class="desc">在怪物浪潮中生存 20 波，收集材料，升级武器！</p>
+      <div class="version-badge" id="versionBadge">v001</div>
+      <h1>Yua Brother</h1>
+      <p class="subtitle">土豆兄弟 · Potato Survivor</p>
+      <p class="desc">30 波章节征途 · 武器升级与附魔 · 走位生存</p>
       <div class="char-select">
         <h3>选择角色</h3>
         <div id="charList" class="char-list"></div>
       </div>
       <button id="startBtn" class="btn primary">开始游戏</button>
       <div class="controls-hint">
-        <p><kbd>WASD</kbd> 移动 · 武器自动攻击 · 波次结束后进入商店</p>
+        <p><kbd>WASD</kbd> 移动 · 武器自动攻击 · 波次结束收集材料后进入商店</p>
       </div>
     </div>
 
-    <!-- 商店 -->
     <div id="shopScreen" class="screen hidden">
       <div class="shop-header">
-        <h2>🛒 商店 · 第 <span id="shopWave">1</span> 波结束</h2>
-        <div class="materials">💰 材料: <span id="shopMaterials">0</span></div>
+        <h2>商店 · 第 <span id="shopWave">1</span> 波 · <span id="shopChapter"></span></h2>
+        <div class="materials">材料: <span id="shopMaterials">0</span></div>
       </div>
       <div class="shop-body">
         <div class="shop-section">
-          <h3>商品</h3>
+          <h3>商品（武器 / 升级 / 附魔 / 属性）</h3>
           <div id="shopItems" class="shop-items"></div>
-          <button id="rerollBtn" class="btn secondary">刷新 (<span id="rerollCost">2</span> 💰)</button>
+          <button id="rerollBtn" class="btn secondary">刷新 (<span id="rerollCost">2</span>)</button>
         </div>
         <div class="shop-section">
           <h3>我的武器 (<span id="weaponCount">0</span>/6)</h3>
@@ -46,29 +45,27 @@
           <div id="statsPanel" class="stats-panel"></div>
         </div>
       </div>
-      <button id="nextWaveBtn" class="btn primary">开始下一波 →</button>
+      <button id="nextWaveBtn" class="btn primary">开始下一波</button>
     </div>
 
-    <!-- 游戏结束 -->
     <div id="gameOverScreen" class="screen hidden">
       <h1 id="gameOverTitle">游戏结束</h1>
       <p id="gameOverStats"></p>
       <button id="restartBtn" class="btn primary">再来一局</button>
     </div>
 
-    <!-- HUD -->
     <div id="hud" class="hud hidden">
       <div class="hud-top">
-        <div class="hud-item">❤️ <span id="hudHp">100</span>/<span id="hudMaxHp">100</span></div>
-        <div class="hud-item">💰 <span id="hudMaterials">0</span></div>
-        <div class="hud-item">🌊 波次 <span id="hudWave">1</span>/20</div>
-        <div class="hud-item">⏱️ <span id="hudTimer">20</span>s</div>
+        <div class="hud-item">HP <span id="hudHp">100</span>/<span id="hudMaxHp">100</span></div>
+        <div class="hud-item">$ <span id="hudMaterials">0</span></div>
+        <div class="hud-item">Wave <span id="hudWave">1</span>/<span id="hudMaxWaves">30</span></div>
+        <div class="hud-item" id="hudChapter">Grove</div>
+        <div class="hud-item"><span id="hudTimer">20</span>s</div>
       </div>
       <div class="hud-weapons" id="hudWeapons"></div>
       <div class="wave-bar"><div id="waveProgress" class="wave-progress"></div></div>
     </div>
   </div>
-
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

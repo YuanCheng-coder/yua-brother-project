@@ -1,13 +1,15 @@
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, ARENA_PADDING,
-  MAX_WAVES, ENEMY_TYPES, CHARACTERS,
+  MAX_WAVES, ENEMY_TYPES, CHARACTERS, TERRAIN_TYPES, TILE,
   getWaveDuration, getWaveSpawnRate, getWaveMaxAlive, pickEnemyType, dist,
+  getChapterForWave, getWavePowerScale, buildTerrainMap, sampleTerrain,
 } from './constants.js';
 import {
   Player, Enemy, Material, Particle,
   setEnemyList, spawnParticles, spawnBlood, angleDiff,
 } from './entities.js';
 import { Shop } from './shop.js';
+import { drawAmbientDust, drawPlayerGlow, drawTerrain } from './render/fx.js';
 
 export const GameState = {
   MENU: 'menu',
@@ -45,6 +47,9 @@ export class Game {
     this.totalKills = 0;
     this.shake = 0;
     this.hurtVignette = 0;
+    this.chapter = null;
+    this.tiles = [];
+    this.time = 0;
 
     this._bindInput();
     this.resize();
@@ -107,9 +112,9 @@ export class Game {
 
   startSync(charIndex) {
     this.keys = {};
-    this.player = new Player(CHARACTERS[charIndex]);
-    // 开局赠送一把手枪，避免空手挨打
-    this.player.addWeapon('pistol', 1);
+    const char = CHARACTERS[charIndex];
+    this.player = new Player(char);
+    this.player.addWeapon(char.startWeapon || 'pistol', 1);
     this.enemies = [];
     this.materials = [];
     this.projectiles = [];
@@ -119,26 +124,32 @@ export class Game {
     this.totalKills = 0;
     this.shake = 0;
     this.hurtVignette = 0;
+    this.time = 0;
     this.state = GameState.PLAYING;
     this._startWave();
   }
 
   _startWave() {
+    this.chapter = getChapterForWave(this.wave);
+    const cols = Math.floor((CANVAS_WIDTH - ARENA_PADDING * 2) / TILE);
+    const rows = Math.floor((CANVAS_HEIGHT - ARENA_PADDING * 2) / TILE);
+    this.tiles = buildTerrainMap(this.chapter, cols, rows);
+    this.powerScale = getWavePowerScale(this.wave);
+
     this.waveDuration = getWaveDuration(this.wave);
     this.waveTimer = this.waveDuration;
     this.enemiesSpawned = 0;
     this.spawnTimer = 0.4;
     this.spawnRate = getWaveSpawnRate(this.wave);
     this.maxAlive = getWaveMaxAlive(this.wave);
-    this.waveEnded = false; // 倒计时结束才停刷，清场后进商店
-    this.isBossWave = this.wave === MAX_WAVES;
+    this.waveEnded = false;
+    this.isBossWave = this.wave === MAX_WAVES || this.wave === 20;
     this.miniBossSpawnedThisWave = 0;
     this.enemyProjectiles = [];
     if (this.isBossWave) {
       this.spawnTimer = 0;
       this._spawnEnemy(true);
     } else if (this.wave >= 5 && this.wave % 4 === 1) {
-      // 第 5/9/13/17 波开场刷一只小 Boss
       this._spawnEnemy(false, true);
     }
     setEnemyList(this.enemies);
@@ -174,7 +185,7 @@ export class Game {
       if (type.isMiniBoss) this.miniBossSpawnedThisWave++;
     }
 
-    this.enemies.push(new Enemy(type, this.wave, x, y));
+    this.enemies.push(new Enemy(type, this.wave, x, y, this.powerScale || 1));
     this.enemiesSpawned++;
   }
 
@@ -295,6 +306,16 @@ export class Game {
 
     if (this.state !== GameState.PLAYING) return;
 
+    this.time += dt;
+    // 地形影响移速 / 熔岩伤害
+    if (this.tiles?.length) {
+      const tile = sampleTerrain(this.tiles, this.player.x, this.player.y, ARENA_PADDING);
+      this.player.terrainSpeed = tile.speed || 1;
+      if (tile.hazard > 0) {
+        this.player.hp -= tile.hazard * dt;
+        this.hurtVignette = Math.max(this.hurtVignette, 0.2);
+      }
+    }
     this.player.update(dt, this.keys);
     setEnemyList(this.enemies);
 
@@ -480,31 +501,23 @@ export class Game {
       ctx.translate(sx, sy);
     }
 
-    // Arena background
+    const theme = this.chapter?.theme || { bg0: '#1a1a30', bg1: '#0d0d18', accent: '#f4a261', ambient: '#fff' };
     const grad = ctx.createRadialGradient(
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 50,
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 500
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 40,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 520
     );
-    grad.addColorStop(0, '#1a1a30');
-    grad.addColorStop(1, '#0d0d18');
+    grad.addColorStop(0, theme.bg0);
+    grad.addColorStop(1, theme.bg1);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Arena border
-    ctx.strokeStyle = '#2a2a40';
+    drawTerrain(ctx, this.tiles, ARENA_PADDING, TILE, TERRAIN_TYPES);
+    drawAmbientDust(ctx, this.time || 0, theme.ambient);
+
+    ctx.strokeStyle = theme.accent + '66';
     ctx.lineWidth = 3;
     ctx.strokeRect(ARENA_PADDING, ARENA_PADDING,
       CANVAS_WIDTH - ARENA_PADDING * 2, CANVAS_HEIGHT - ARENA_PADDING * 2);
-
-    // Grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1;
-    for (let x = ARENA_PADDING; x < CANVAS_WIDTH; x += 40) {
-      ctx.beginPath(); ctx.moveTo(x, ARENA_PADDING); ctx.lineTo(x, CANVAS_HEIGHT - ARENA_PADDING); ctx.stroke();
-    }
-    for (let y = ARENA_PADDING; y < CANVAS_HEIGHT; y += 40) {
-      ctx.beginPath(); ctx.moveTo(ARENA_PADDING, y); ctx.lineTo(CANVAS_WIDTH - ARENA_PADDING, y); ctx.stroke();
-    }
 
     if (
       this.state !== GameState.PLAYING
@@ -571,7 +584,9 @@ export class Game {
     // Particles（含流血）
     for (const p of this.particles) p.draw(ctx);
 
-    // Player
+    // Player + 光晕
+    const glow = this.player.charDef?.color || '#f4a261';
+    drawPlayerGlow(ctx, this.player.x, this.player.y, glow, 56);
     this.player.draw(ctx);
 
     // 受击红闪（轻微）
@@ -608,6 +623,8 @@ export class Game {
       maxHp: this.player?.maxHp || 0,
       materials: this.player?.materials || 0,
       wave: this.wave,
+      maxWaves: MAX_WAVES,
+      chapter: this.chapter ? `${this.chapter.emoji} ${this.chapter.name}` : '',
       timer: this.state === GameState.COLLECTING ? 0 : Math.ceil(this.waveTimer),
       progress: this.state === GameState.COLLECTING
         ? 1
