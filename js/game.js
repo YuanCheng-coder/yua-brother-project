@@ -500,6 +500,9 @@ export class Game {
     const deadEnemies = this.enemies.filter(e => e.dead);
     for (const e of deadEnemies) {
       const amt = onEnemyKilled(this, e);
+      if (this.challengeActive && e.challengeLoot) {
+        this.player.heal(4); // challengeHealOnClear
+      }
       this.materials.push(new Material(e.x, e.y, amt));
       spawnParticles(this.particles, e.x, e.y, e.type.color);
       this.player.kills++;
