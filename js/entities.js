@@ -79,7 +79,7 @@ export class Player {
   grantPerfectDodge(game) {
     if (!this.inContact) return false;
     this.inContact = false;
-    this.invincible = Math.max(this.invincible, 0.45 * this.iFramesMult);
+    this.invincible = Math.max(this.invincible, 0.55 * this.iFramesMult);
     this.perfectDodgeFlash = 0.35;
     if (game) game.closeCallFlash = Math.max(game.closeCallFlash || 0, 0.35);
     return true;
