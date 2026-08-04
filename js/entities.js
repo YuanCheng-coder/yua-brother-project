@@ -445,7 +445,7 @@ export class Material {
       const angle = Math.atan2(player.y - this.y, player.x - this.x);
       const t = this.vacuum ? Math.min(1, 1 - d / 500) : (1 - d / this.magnetRange);
       const speed = this.vacuum
-        ? lerp(420, 1100, Math.max(0, t))
+        ? lerp(520, 1400, Math.max(0, t))
         : lerp(280, 900, Math.max(0, t) ** 2);
       this.x += Math.cos(angle) * speed * dt;
       this.y += Math.sin(angle) * speed * dt;

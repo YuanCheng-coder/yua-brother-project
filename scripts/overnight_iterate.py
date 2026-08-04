@@ -163,21 +163,25 @@ def run(cmd, cwd=None, check=False):
 
 
 def ensure_server():
-    try:
-        urllib.request.urlopen(SERVER + "/", timeout=2)
-        return True
-    except Exception:
-        pass
+    for _try in range(2):
+        try:
+            urllib.request.urlopen(SERVER + "/", timeout=2)
+            return True
+        except Exception:
+            time.sleep(0.3)
+    # only kill listeners that fail health check
     run("lsof -ti:8765 | xargs kill -9 2>/dev/null; true")
+    time.sleep(0.2)
     subprocess.Popen(
-        ["python3", "-m", "http.server", "8765"],
+        ["python3", "-u", "-m", "http.server", "8765", "--bind", "127.0.0.1"],
         cwd=str(ROOT),
         stdout=open("/tmp/yua-http.log", "a"),
         stderr=subprocess.STDOUT,
     )
-    time.sleep(0.8)
+    time.sleep(1.0)
     try:
         urllib.request.urlopen(SERVER + "/", timeout=3)
+        print("server restarted ok")
         return True
     except Exception as e:
         print("server fail", e)
