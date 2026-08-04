@@ -10,14 +10,20 @@ import {
 } from './entities.js';
 import { Shop } from './shop.js';
 import { drawAmbientDust, drawPlayerGlow, drawTerrain } from './render/fx.js';
+import {
+  applyLastStand, tickHitstop, onEnemyKilled, tickRage,
+  maybeSpawnPortal, maybeSpawnCrate, updatePortal, updateCrates,
+  drawTensionOverlays, getEliteType, comboTier,
+} from './systems/tension.js';
 
 export const GameState = {
   MENU: 'menu',
   PLAYING: 'playing',
-  COLLECTING: 'collecting', // 波次结束：吸金币阶段
+  COLLECTING: 'collecting',
   SHOP: 'shop',
   GAME_OVER: 'game_over',
   VICTORY: 'victory',
+  CONTINUE_OFFER: 'continue_offer',
 };
 
 export class Game {
@@ -50,6 +56,18 @@ export class Game {
     this.chapter = null;
     this.tiles = [];
     this.time = 0;
+    this.continueUsed = false;
+    this.cursedRun = false;
+    this.enemySpeedCurse = 1;
+    this.crates = [];
+    this.challengePortal = null;
+    this.combo = 0;
+    this.comboTimer = 0;
+    this.rageTimer = 0;
+    this.rageKillTimes = [];
+    this.worldSlow = 1;
+    this.lastStand = false;
+    this.hitstop = 0;
 
     this._bindInput();
     this.resize();
@@ -99,7 +117,6 @@ export class Game {
       }
     });
 
-    // 失焦时清空按键，避免 W/↑ 卡住导致一直往上走
     const clearKeys = () => { this.keys = {}; };
     window.addEventListener('blur', clearKeys);
     document.addEventListener('visibilitychange', () => {
@@ -121,13 +138,48 @@ export class Game {
     this.projectiles = [];
     this.enemyProjectiles = [];
     this.particles = [];
+    this.crates = [];
+    this.challengePortal = null;
     this.wave = 1;
     this.totalKills = 0;
     this.shake = 0;
     this.hurtVignette = 0;
     this.time = 0;
+    this.continueUsed = false;
+    this.cursedRun = false;
+    this.enemySpeedCurse = 1;
+    this.combo = 0;
+    this.comboTimer = 0;
+    this.rageTimer = 0;
+    this.rageKillTimes = [];
+    this.worldSlow = 1;
+    this.lastStand = false;
+    this.hitstop = 0;
+    this.challengeActive = false;
     this.state = GameState.PLAYING;
     this._startWave();
+  }
+
+  /** One-time cursed continue: half HP, enemies +20% speed */
+  acceptCursedContinue() {
+    if (this.continueUsed || !this.player) return false;
+    this.continueUsed = true;
+    this.cursedRun = true;
+    this.enemySpeedCurse = 1.2;
+    this.player.hp = Math.max(1, Math.floor(this.player.maxHp * 0.5));
+    this.player.invincible = 1.5;
+    this.enemies = [];
+    this.enemyProjectiles = [];
+    this.projectiles = [];
+    this.hurtVignette = 0.6;
+    this.shake = 8;
+    this.state = GameState.PLAYING;
+    this.keys = {};
+    return true;
+  }
+
+  declineContinue() {
+    this.state = GameState.GAME_OVER;
   }
 
   _startWave() {
@@ -144,39 +196,49 @@ export class Game {
     this.spawnRate = getWaveSpawnRate(this.wave);
     this.maxAlive = getWaveMaxAlive(this.wave);
     this.waveEnded = false;
-    this.isBossWave = this.wave === MAX_WAVES || this.wave === 20;
+    this.isBossWave = this.wave === MAX_WAVES || this.wave === 20 || this.wave === 10;
     this.miniBossSpawnedThisWave = 0;
     this.enemyProjectiles = [];
+    this.crates = [];
+    this.challengePortal = null;
+    this.challengeActive = false;
+    this.portalBanner = 0;
     if (this.isBossWave) {
       this.spawnTimer = 0;
       this._spawnEnemy(true);
-    } else if (this.wave >= 5 && this.wave % 4 === 1) {
+    } else if (this.wave >= 5 && this.wave % 5 === 0) {
       this._spawnEnemy(false, true);
     }
     setEnemyList(this.enemies);
     this.chapterBanner = 2.2;
+    this._eventPortalAt = this.isBossWave ? -1 : 2.5;
+    this._eventCrateAt = this.isBossWave ? -1 : 2.8;
+    this._eventCrate2At = this.isBossWave ? -1 : 7.0;
+    this._waveElapsed = 0;
   }
 
   _aliveCount() {
     return this.enemies.filter(e => !e.dead).length;
   }
 
-  _spawnEnemy(forceBoss = false, forceMiniBoss = false) {
-    const side = Math.floor(Math.random() * 4);
-    let x, y;
-    const pad = ARENA_PADDING;
-    switch (side) {
-      case 0: x = pad + Math.random() * (CANVAS_WIDTH - pad * 2); y = pad - 10; break;
-      case 1: x = CANVAS_WIDTH - pad + 10; y = pad + Math.random() * (CANVAS_HEIGHT - pad * 2); break;
-      case 2: x = pad + Math.random() * (CANVAS_WIDTH - pad * 2); y = CANVAS_HEIGHT - pad + 10; break;
-      default: x = pad - 10; y = pad + Math.random() * (CANVAS_HEIGHT - pad * 2);
+  _spawnEnemy(forceBoss = false, forceMiniBoss = false, x0 = null, y0 = null, challengeLoot = false) {
+    let x = x0, y = y0;
+    if (x == null || y == null) {
+      const side = Math.floor(Math.random() * 4);
+      const pad = ARENA_PADDING;
+      switch (side) {
+        case 0: x = pad + Math.random() * (CANVAS_WIDTH - pad * 2); y = pad - 10; break;
+        case 1: x = CANVAS_WIDTH - pad + 10; y = pad + Math.random() * (CANVAS_HEIGHT - pad * 2); break;
+        case 2: x = pad + Math.random() * (CANVAS_WIDTH - pad * 2); y = CANVAS_HEIGHT - pad + 10; break;
+        default: x = pad - 10; y = pad + Math.random() * (CANVAS_HEIGHT - pad * 2);
+      }
     }
 
     let type;
     if (forceBoss || this.isBossWave) {
       type = ENEMY_TYPES.find(t => t.isBoss);
     } else if (forceMiniBoss) {
-      type = ENEMY_TYPES.find(t => t.isMiniBoss);
+      type = getEliteType();
       this.miniBossSpawnedThisWave++;
     } else {
       const aliveMini = this.enemies.filter(e => !e.dead && e.type.isMiniBoss).length;
@@ -187,8 +249,15 @@ export class Game {
       if (type.isMiniBoss) this.miniBossSpawnedThisWave++;
     }
 
-    this.enemies.push(new Enemy(type, this.wave, x, y, this.powerScale || 1));
+    const e = new Enemy(type, this.wave, x, y, this.powerScale || 1);
+    e.speed *= this.enemySpeedCurse || 1;
+    e.challengeLoot = challengeLoot;
+    this.enemies.push(e);
     this.enemiesSpawned++;
+  }
+
+  _spawnChallengeElite(atPlayer, x, y) {
+    this._spawnEnemy(false, true, x, y, true);
   }
 
   _trySpawn(dt) {
@@ -202,7 +271,6 @@ export class Game {
         this.spawnTimer = 0.15;
         break;
       }
-      // 中后期经常一次刷多只，堆密度
       let batch = 1;
       if (this.wave >= 3 && Math.random() < 0.4) batch = 2;
       if (this.wave >= 8 && Math.random() < 0.45) batch = 3;
@@ -214,7 +282,6 @@ export class Game {
       this.spawnTimer += interval;
     }
 
-    // 场上稀少时立刻补怪，保持压迫
     const alive = this._aliveCount();
     if (alive <= 2 && this.enemiesSpawned > 0) {
       const refill = Math.min(3 + Math.floor(this.wave / 4), 6);
@@ -226,31 +293,29 @@ export class Game {
     }
   }
 
-  /** 时间到：击杀场上剩余小怪并掉落材料 */
   _clearRemainingEnemies() {
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.dead = true;
       e.hp = 0;
-      this.materials.push(new Material(e.x, e.y, e.type.material));
+      const amt = onEnemyKilled(this, e);
+      this.materials.push(new Material(e.x, e.y, amt));
       spawnParticles(this.particles, e.x, e.y, e.type.color, 6);
       this.player.kills++;
       this.totalKills++;
-      this.combo = (this.combo || 0) + 1;
-      this.comboTimer = 2.5;
     }
     this.enemies = [];
     this.enemyProjectiles = [];
   }
 
-  /** 进入收钱阶段：全图吸金币，吸完再进商店 */
   _startCollecting() {
     this.keys = {};
     this.enemies = [];
     this.projectiles = [];
     this.enemyProjectiles = [];
+    this.challengePortal = null;
     this.collectTimer = 0;
-    this.collectTimeout = 4; // 安全上限，防止卡死
+    this.collectTimeout = 4;
     for (const m of this.materials) {
       m.vacuum = true;
       m.life = 99;
@@ -264,6 +329,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.enemyProjectiles = [];
+    this.crates = [];
 
     if (this.wave >= MAX_WAVES) {
       this.state = GameState.VICTORY;
@@ -275,6 +341,7 @@ export class Game {
 
   nextWave() {
     this.keys = {};
+    this.shop.expireFlashDeal?.();
     this.wave++;
     if (this.wave > MAX_WAVES) {
       this.state = GameState.VICTORY;
@@ -287,7 +354,6 @@ export class Game {
   update(dt) {
     dt = Math.min(dt, 0.05);
 
-    // —— 收钱阶段：只吸材料，吸完进商店 ——
     if (this.state === GameState.COLLECTING) {
       this.player.update(dt, this.keys);
       this.collectTimer += dt;
@@ -297,9 +363,7 @@ export class Game {
       this.particles = this.particles.filter(p => p.life > 0);
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 28);
       if (this.hurtVignette > 0) this.hurtVignette = Math.max(0, this.hurtVignette - dt * 1.8);
-
       if (this.materials.length === 0 || this.collectTimer >= this.collectTimeout) {
-        // 超时则把剩余直接入账
         for (const m of this.materials) {
           if (!m.collected) this.player.materials += m.amount;
         }
@@ -310,35 +374,60 @@ export class Game {
 
     if (this.state !== GameState.PLAYING) return;
 
+    // Hitstop freezes world briefly on big kills
+    if (tickHitstop(this, dt)) {
+      this.drawReady = true;
+      return;
+    }
+
+    applyLastStand(this, dt);
+    const worldDt = dt * (this.worldSlow || 1);
+    // Player stays responsive in last stand; world slows
+    const playerDt = this.lastStand ? dt : worldDt;
+
     this.time += dt;
-    // 地形影响移速 / 熔岩伤害
     if (this.tiles?.length) {
       const tile = sampleTerrain(this.tiles, this.player.x, this.player.y, ARENA_PADDING);
       this.player.terrainSpeed = tile.speed || 1;
       if (tile.hazard > 0) {
-        this.player.hp -= tile.hazard * dt;
+        this.player.hp -= tile.hazard * playerDt;
         this.hurtVignette = Math.max(this.hurtVignette, 0.2);
       }
     }
-    this.player.update(dt, this.keys);
+    this.player._gameRef = this;
+    this.player.update(playerDt, this.keys);
     setEnemyList(this.enemies);
+    tickRage(this, dt);
 
-    // 倒计时内持续刷怪；时间到 → 清场后进入收钱
     if (!this.waveEnded) {
-      this.waveTimer -= dt;
+      this.waveTimer -= worldDt;
       if (this.waveTimer <= 0) {
         this.waveTimer = 0;
         this.waveEnded = true;
-        // 普通波：时间到清场 → 收钱；Boss 波需亲手击杀
         if (!this.isBossWave) {
           this._clearRemainingEnemies();
           this._startCollecting();
           return;
         }
       } else {
-        this._trySpawn(dt);
+        this._waveElapsed = (this._waveElapsed || 0) + worldDt;
+        if (this._eventPortalAt > 0 && this._waveElapsed >= this._eventPortalAt) {
+          this._eventPortalAt = -1;
+          maybeSpawnPortal(this);
+        }
+        if (this._eventCrateAt > 0 && this._waveElapsed >= this._eventCrateAt) {
+          this._eventCrateAt = -1;
+          maybeSpawnCrate(this);
+        }
+        if (this._eventCrate2At > 0 && this._waveElapsed >= this._eventCrate2At) {
+          this._eventCrate2At = -1;
+          maybeSpawnCrate(this);
+        }
+        this._trySpawn(worldDt);
+        updatePortal(this, worldDt, (elite, x, y) => this._spawnChallengeElite(elite, x, y));
+        updateCrates(this, worldDt);
+        if ((this.portalBanner || 0) > 0) this.portalBanner -= dt;
       }
-      // Boss 波：击杀后进入收钱
       if (this.isBossWave && this._aliveCount() === 0 && this.enemiesSpawned > 0) {
         this.waveEnded = true;
         this.waveTimer = 0;
@@ -347,60 +436,54 @@ export class Game {
       }
     }
 
-    // Weapon firing
     for (const w of this.player.weapons) {
-      const shots = w.update(dt, this.player);
+      const shots = w.update(playerDt, this.player);
       if (shots) {
         this.projectiles.push(...shots);
-        this.muzzleFlashes = (this.muzzleFlashes || []).concat(shots.filter(s => s.type === 'projectile').map(s => ({ x: s.x, y: s.y, angle: Math.atan2(s.vy, s.vx), life: 0.08 })));
+        this.muzzleFlashes = (this.muzzleFlashes || []).concat(
+          shots.filter(s => s.type === 'projectile').map(s => ({
+            x: s.x, y: s.y, angle: Math.atan2(s.vy, s.vx), life: 0.08,
+          }))
+        );
       }
     }
 
-    // Update enemies（收集敌方子弹）
     for (const e of this.enemies) {
-      const shots = e.update(dt, this.player);
+      const shots = e.update(worldDt, this.player);
       if (shots?.length) this.enemyProjectiles.push(...shots);
     }
     this._consumeHitFeedback();
 
-    // Update projectiles
-    this._updateProjectiles(dt);
-    this._updateEnemyProjectiles(dt);
+    this._updateProjectiles(worldDt);
+    this._updateEnemyProjectiles(worldDt);
     this._consumeHitFeedback();
 
-    // 受击反馈衰减
-    if (this.shake > 0) {
-      this.shake = Math.max(0, this.shake - dt * 28);
-    }
-    if ((this.impactZoom || 0) > 0) {
-      this.impactZoom = Math.max(0, this.impactZoom - dt * 0.25);
-    }
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 28);
+    if ((this.impactZoom || 0) > 0) this.impactZoom = Math.max(0, this.impactZoom - dt * 0.25);
     if ((this.chapterBanner || 0) > 0) this.chapterBanner -= dt;
     if ((this.comboTimer || 0) > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
     }
+    if ((this.closeCallFlash || 0) > 0) this.closeCallFlash = Math.max(0, this.closeCallFlash - dt);
+    if (this.bossDefeatBurst) {
+      this.bossDefeatBurst.life -= dt;
+      if (this.bossDefeatBurst.life <= 0) this.bossDefeatBurst = null;
+    }
     for (const m of (this.muzzleFlashes || [])) m.life -= dt;
     this.muzzleFlashes = (this.muzzleFlashes || []).filter(m => m.life > 0);
-    if (this.hurtVignette > 0) {
-      this.hurtVignette = Math.max(0, this.hurtVignette - dt * 1.8);
-    }
+    if (this.hurtVignette > 0) this.hurtVignette = Math.max(0, this.hurtVignette - dt * 1.8);
 
-    // Update materials
-    for (const m of this.materials) m.update(dt, this.player);
+    for (const m of this.materials) m.update(playerDt, this.player);
     this.materials = this.materials.filter(m => !m.collected && m.life > 0);
 
-    // Update particles
     for (const p of this.particles) p.update(dt);
     this.particles = this.particles.filter(p => p.life > 0);
 
-    // Cleanup dead enemies
-    for (const e of this.enemies) {
-      if (e.dead) continue;
-    }
     const deadEnemies = this.enemies.filter(e => e.dead);
     for (const e of deadEnemies) {
-      this.materials.push(new Material(e.x, e.y, e.type.material));
+      const amt = onEnemyKilled(this, e);
+      this.materials.push(new Material(e.x, e.y, amt));
       spawnParticles(this.particles, e.x, e.y, e.type.color);
       this.player.kills++;
       this.totalKills++;
@@ -408,9 +491,13 @@ export class Game {
     }
     this.enemies = this.enemies.filter(e => !e.dead);
 
-    // Check death
     if (this.player.hp <= 0) {
-      this.state = GameState.GAME_OVER;
+      if (!this.continueUsed) {
+        this.player.hp = 0;
+        this.state = GameState.CONTINUE_OFFER;
+      } else {
+        this.state = GameState.GAME_OVER;
+      }
     }
   }
 
@@ -438,12 +525,11 @@ export class Game {
 
       if (p.type === 'melee') {
         p.life -= dt;
-        if (p.damage <= 0) continue; // 纯特效
+        if (p.damage <= 0) continue;
         for (const e of this.enemies) {
           if (e.dead || p.hitEnemies.has(e)) continue;
           const d = Math.hypot(e.x - p.x, e.y - p.y);
           if (d > p.range + e.radius) continue;
-          // 贴身敌人忽略角度，避免贴脸上却砍不中
           const pointBlank = d < this.player.radius + e.radius + 12 || p.pointBlank;
           const inArc = pointBlank || (p.sweep
             ? angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.angle) < 1.2
@@ -472,7 +558,6 @@ export class Game {
           }
         }
 
-        // 先判定再移动，避免高速弹一帧穿过贴身敌人
         const tryHit = () => {
           for (const e of this.enemies) {
             if (e.dead || p.hitEnemies.has(e) || p.life <= 0) continue;
@@ -497,7 +582,12 @@ export class Game {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= dt;
-      if (dist(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) {
+      const d = dist(p.x, p.y, this.player.x, this.player.y);
+      // Perfect-dodge proximity flash while i-frames active
+      if (this.player.invincible > 0 && d < this.player.radius + 40) {
+        this.closeCallFlash = Math.max(this.closeCallFlash || 0, 0.28);
+      }
+      if (d < p.radius + this.player.radius) {
         this.player.takeDamage(p.damage);
         p.life = 0;
         spawnParticles(this.particles, p.x, p.y, p.color, 4);
@@ -511,7 +601,6 @@ export class Game {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     ctx.save();
-    // 轻微屏幕抖动 + 受击冲击缩放
     if (this.shake > 0.2) {
       const sx = (Math.random() - 0.5) * this.shake * 2;
       const sy = (Math.random() - 0.5) * this.shake * 2;
@@ -546,6 +635,7 @@ export class Game {
       this.state !== GameState.PLAYING
       && this.state !== GameState.COLLECTING
       && this.state !== GameState.SHOP
+      && this.state !== GameState.CONTINUE_OFFER
     ) {
       ctx.restore();
       return;
@@ -555,10 +645,8 @@ export class Game {
       return;
     }
 
-    // Materials
     for (const m of this.materials) m.draw(ctx);
 
-    // Projectiles
     for (const p of this.projectiles) {
       if (p.type === 'melee') {
         ctx.save();
@@ -568,12 +656,8 @@ export class Game {
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        if (p.sweep) {
-          ctx.arc(0, 0, p.range, -0.6, 0.6);
-        } else {
-          ctx.moveTo(0, 0);
-          ctx.lineTo(p.range, 0);
-        }
+        if (p.sweep) ctx.arc(0, 0, p.range, -0.6, 0.6);
+        else { ctx.moveTo(0, 0); ctx.lineTo(p.range, 0); }
         ctx.stroke();
         ctx.restore();
       } else {
@@ -589,30 +673,24 @@ export class Game {
       }
     }
 
-    // Enemy projectiles
     for (const p of this.enemyProjectiles) {
       ctx.save();
       ctx.fillStyle = p.color;
       ctx.shadowColor = p.color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
 
-    // Enemies
     for (const e of this.enemies) e.draw(ctx);
-
-    // Particles（含流血）
     for (const p of this.particles) p.draw(ctx);
 
-    // Player + 光晕
     const glow = this.player.charDef?.color || '#f4a261';
-    drawPlayerGlow(ctx, this.player.x, this.player.y, glow, 56);
+    drawPlayerGlow(ctx, this.player.x, this.player.y, glow, this.player.rageActive ? 80 : 56);
     this.player.draw(ctx);
 
-    // 受击红闪（轻微）
     if (this.hurtVignette > 0.01) {
       const a = Math.min(0.45, this.hurtVignette);
       const vg = ctx.createRadialGradient(
@@ -625,7 +703,8 @@ export class Game {
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 
-    // 章节横幅
+    drawTensionOverlays(ctx, this);
+
     if ((this.chapterBanner || 0) > 0 && this.chapter) {
       const a = Math.min(1, this.chapterBanner);
       ctx.save();
@@ -639,17 +718,15 @@ export class Game {
       ctx.restore();
     }
 
-    // 连击提示
-    if ((this.combo || 0) >= 3) {
+    if (this.cursedRun) {
       ctx.save();
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 20px Segoe UI, system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`COMBO x${this.combo}`, 24, 86);
+      ctx.fillStyle = 'rgba(168,85,247,0.85)';
+      ctx.font = 'bold 12px Segoe UI, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('☠️ CURSED', CANVAS_WIDTH - 16, 24);
       ctx.restore();
     }
 
-    // 收钱阶段提示
     if (this.state === GameState.COLLECTING) {
       ctx.save();
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -657,7 +734,7 @@ export class Game {
       ctx.fillStyle = '#f4a261';
       ctx.font = 'bold 22px Segoe UI, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('💰 正在收集材料…', CANVAS_WIDTH / 2, 34);
+      ctx.fillText('💰 正在收集全部材料…', CANVAS_WIDTH / 2, 34);
       ctx.restore();
     }
 
@@ -665,6 +742,7 @@ export class Game {
   }
 
   getHudData() {
+    const tier = comboTier(this.combo || 0);
     return {
       hp: Math.ceil(this.player?.hp || 0),
       maxHp: this.player?.maxHp || 0,
@@ -676,6 +754,11 @@ export class Game {
       progress: this.state === GameState.COLLECTING
         ? 1
         : 1 - this.waveTimer / this.waveDuration,
+      combo: this.combo || 0,
+      comboMult: tier.label,
+      rage: Math.max(0, this.rageTimer || 0),
+      lastStand: !!this.lastStand,
+      cursed: !!this.cursedRun,
     };
   }
 }

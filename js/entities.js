@@ -41,9 +41,17 @@ export class Player {
     this.vy = 0;
     this.invincible = 0;
     this.regenTimer = 0;
+    this.lastStandActive = false;
+    this.rageActive = false;
+    this.damageModRage = 1;
+    this.speedModRage = 1;
+    this.attackSpeedModRage = 1;
+    this.inContact = false;
   }
 
-  get speed() { return this.baseSpeed * this.speedMod * (this.terrainSpeed || 1); }
+  get speed() {
+    return this.baseSpeed * this.speedMod * (this.terrainSpeed || 1) * (this.speedModRage || 1);
+  }
 
   addWeapon(weaponId, tier = 1) {
     const existing = this.weapons.find(w => w.id === weaponId && w.tier === tier);
@@ -63,7 +71,18 @@ export class Player {
     this.hp -= reduced;
     this.invincible = 0.35 * this.iFramesMult;
     this.hitFeedback = { amount: reduced, x: this.x, y: this.y };
+    this.inContact = true;
     return reduced;
+  }
+
+  /** Perfect dodge: brief i-frames when leaving enemy contact */
+  grantPerfectDodge(game) {
+    if (!this.inContact) return false;
+    this.inContact = false;
+    this.invincible = Math.max(this.invincible, 0.45 * this.iFramesMult);
+    this.perfectDodgeFlash = 0.35;
+    if (game) game.closeCallFlash = Math.max(game.closeCallFlash || 0, 0.35);
+    return true;
   }
 
   heal(amount) {
@@ -88,6 +107,7 @@ export class Player {
     this.y = clamp(this.y, ARENA_PADDING + this.radius, CANVAS_HEIGHT - ARENA_PADDING - this.radius);
 
     if (this.invincible > 0) this.invincible -= dt;
+    if ((this.perfectDodgeFlash || 0) > 0) this.perfectDodgeFlash -= dt;
     if (this.regen > 0) {
       this.regenTimer += dt;
       if (this.regenTimer >= 1) {
@@ -95,13 +115,20 @@ export class Player {
         this.heal(this.regen);
       }
     }
-    // 武器开火只在 Game.update 里处理，避免重复调用导致攻击丢失
   }
 
   draw(ctx) {
     ctx.save();
-    if (this.invincible > 0 && Math.floor(this.invincible * 10) % 2 === 0) {
+    if (this.invincible > 0 && Math.floor(this.invincible * 12) % 2 === 0) {
       ctx.globalAlpha = 0.5;
+    }
+    if ((this.perfectDodgeFlash || 0) > 0) {
+      ctx.shadowColor = '#67e8f9';
+      ctx.shadowBlur = 24;
+    }
+    if (this.rageActive) {
+      ctx.shadowColor = '#f97316';
+      ctx.shadowBlur = 18;
     }
 
     // Shadow
@@ -173,7 +200,7 @@ export function createWeapon(weaponId, tier = 1) {
       const target = findNearestEnemyInRange(player, range);
       if (!target) return null;
 
-      this.cooldown = this.cd / player.attackSpeedMod;
+      this.cooldown = this.cd / player.attackSpeedMod / (player.attackSpeedModRage || 1);
       return fireWeapon(this, player, target);
     },
   };
@@ -210,7 +237,9 @@ function fireWeapon(weapon, player, target) {
   if (def.tags?.includes('magic') || def.tags?.includes('elemental')) {
     damage *= player.elementalMod || 1;
   }
-  if (player.berserk && player.hp < player.maxHp * 0.4) damage *= 1.25;
+  if (player.berserk && player.hp < player.maxHp * 0.45) damage *= 1.28;
+  if (player.lastStandActive) damage *= 1.4;
+  if (player.rageActive) damage *= (player.damageModRage || 1.5);
   const critChance = (player.crit || 0) + (weapon.enchantMods?.crit || 0);
   if (Math.random() < critChance) damage *= 1.75;
   const angle = Math.atan2(target.y - player.y, target.x - player.x);
@@ -309,6 +338,8 @@ export class Enemy {
     this.hitFlash = 0;
     this.wobble = Math.random() * Math.PI * 2;
     this.shootCd = 0.4 + Math.random() * 0.8;
+    this.telegraph = 0;
+    this.challengeLoot = false;
   }
 
   /** @returns {Array} 本帧射出的敌方子弹 */
@@ -319,6 +350,7 @@ export class Enemy {
     const d = dist(this.x, this.y, player.x, player.y);
     const angle = Math.atan2(player.y - this.y, player.x - this.x);
     this.wobble += dt * (this.type.role === 'fast' ? 5 : 3);
+    if (this.telegraph > 0) this.telegraph -= dt;
 
     // 移动：远程怪保持距离，其余追击
     let moveAngle = angle;
@@ -343,19 +375,31 @@ export class Enemy {
     this.x = clamp(this.x, ARENA_PADDING + this.radius, CANVAS_WIDTH - ARENA_PADDING - this.radius);
     this.y = clamp(this.y, ARENA_PADDING + this.radius, CANVAS_HEIGHT - ARENA_PADDING - this.radius);
 
-    // 远程开火
+    // Boss / mini-boss telegraph then fire
     if (this.type.ranged) {
       this.shootCd -= dt;
       const rd = this.type.ranged;
+      const isTelegraphBoss = this.type.isBoss || this.type.isMiniBoss;
       if (this.shootCd <= 0 && d <= rd.range && d > this.radius + player.radius) {
-        this.shootCd = rd.cooldown * (0.85 + Math.random() * 0.3);
-        shots.push(createEnemyProjectile(this, player, rd));
+        if (isTelegraphBoss && this.telegraph <= 0 && !this._windup) {
+          this._windup = true;
+          this.telegraph = 0.55;
+          this.shootCd = 0.55;
+        } else {
+          this._windup = false;
+          this.shootCd = rd.cooldown * (0.85 + Math.random() * 0.3);
+          shots.push(createEnemyProjectile(this, player, rd));
+        }
       }
     }
 
-    // 接触伤害
+    // 接触伤害 + perfect dodge when leaving contact
     if (d < this.radius + player.radius) {
       player.takeDamage(this.damage);
+      player.inContact = true;
+    } else if (player.inContact) {
+      const near = d < this.radius + player.radius + 28;
+      if (!near) player.grantPerfectDodge(player._gameRef);
     }
     if (this.hitFlash > 0) this.hitFlash -= dt;
     return shots;
@@ -385,6 +429,23 @@ export class Enemy {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(this.x, this.y + bob, this.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Boss telegraph ring — readable wind-up before attack
+    if (this.telegraph > 0) {
+      const t = 1 - this.telegraph / 0.55;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.globalAlpha = 0.5 + t * 0.5;
+      ctx.lineWidth = 3 + t * 4;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y + bob, this.radius + 18 + t * 28, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y + bob, this.radius + 10 + t * 10, 0, Math.PI * 2 * t);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }

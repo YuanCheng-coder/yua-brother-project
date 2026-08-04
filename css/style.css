@@ -393,5 +393,46 @@ kbd {
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
+  box-shadow: 0 0 12px rgba(244,162,97,0.35);
 }
 .char-list { max-width: 900px; max-height: 280px; overflow-y: auto; }
+
+/* Shop FOMO */
+.fomo-banner {
+  grid-column: 1 / -1;
+  background: linear-gradient(90deg, rgba(239,68,68,0.25), rgba(249,115,22,0.3));
+  border: 1px solid #f97316;
+  color: #fed7aa;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  animation: fomoPulse 1.2s ease-in-out infinite;
+}
+@keyframes fomoPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(249,115,22,0); }
+  50% { box-shadow: 0 0 16px rgba(249,115,22,0.45); }
+}
+.shop-item.flash-deal {
+  border-color: #f97316;
+  background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(42,42,62,0.9));
+}
+.shop-item.locked-tease {
+  opacity: 0.55;
+  border-style: dashed;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+}
+.old-price {
+  text-decoration: line-through;
+  color: #888;
+  margin-right: 4px;
+  font-size: 0.85em;
+}
+.deal-tag {
+  color: #fb923c;
+  font-weight: 700;
+  font-size: 0.8em;
+}
+#continueScreen h1 { color: #c084fc; }
+#hudCombo, #hudRage { min-width: 4.5rem; }

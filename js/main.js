@@ -11,11 +11,13 @@ const game = new Game(canvas);
 const menuScreen = document.getElementById('menuScreen');
 const shopScreen = document.getElementById('shopScreen');
 const gameOverScreen = document.getElementById('gameOverScreen');
+const continueScreen = document.getElementById('continueScreen');
 const hud = document.getElementById('hud');
 
 let selectedChar = 0;
 let lastTime = 0;
 let shopOpen = false;
+let continueOpen = false;
 
 fetch('./VERSION.json').then(r => r.json()).then(v => {
   const el = document.getElementById('versionBadge');
@@ -38,6 +40,7 @@ CHARACTERS.forEach((c, i) => {
 document.getElementById('startBtn').addEventListener('click', () => {
   menuScreen.classList.add('hidden');
   hud.classList.remove('hidden');
+  continueOpen = false;
   game.startSync(selectedChar);
   canvas.focus();
 });
@@ -62,9 +65,26 @@ document.getElementById('rerollBtn').addEventListener('click', () => {
 
 document.getElementById('restartBtn').addEventListener('click', () => {
   gameOverScreen.classList.add('hidden');
+  continueScreen?.classList.add('hidden');
   menuScreen.classList.remove('hidden');
   hud.classList.add('hidden');
+  continueOpen = false;
   game.state = GameState.MENU;
+});
+
+document.getElementById('cursedContinueBtn')?.addEventListener('click', () => {
+  if (game.acceptCursedContinue()) {
+    continueScreen.classList.add('hidden');
+    hud.classList.remove('hidden');
+    continueOpen = false;
+    canvas.focus();
+  }
+});
+
+document.getElementById('declineContinueBtn')?.addEventListener('click', () => {
+  game.declineContinue();
+  continueScreen.classList.add('hidden');
+  continueOpen = false;
 });
 
 function refreshShop() {
@@ -96,6 +116,26 @@ function updateHud() {
   if (hc) hc.textContent = data.chapter || '';
   document.getElementById('hudTimer').textContent = data.timer;
   document.getElementById('waveProgress').style.width = (data.progress * 100) + '%';
+  const comboEl = document.getElementById('hudCombo');
+  if (comboEl) {
+    comboEl.textContent = data.combo >= 3 ? `Combo ${data.comboMult}` : 'Combo —';
+    comboEl.style.color = data.combo >= 15 ? '#ef4444' : data.combo >= 8 ? '#f97316' : '#fbbf24';
+  }
+  const rageEl = document.getElementById('hudRage');
+  if (rageEl) {
+    if (data.rage > 0) {
+      rageEl.textContent = `🔥 ${data.rage.toFixed(1)}s`;
+      rageEl.style.color = '#fb923c';
+    } else if (data.lastStand) {
+      rageEl.textContent = '⚡ LAST STAND';
+      rageEl.style.color = '#f87171';
+    } else if (data.cursed) {
+      rageEl.textContent = '☠️ CURSED';
+      rageEl.style.color = '#c084fc';
+    } else {
+      rageEl.textContent = '';
+    }
+  }
   if (game.player) renderHudWeapons(document.getElementById('hudWeapons'), game.player);
 }
 
@@ -115,17 +155,29 @@ function gameLoop(timestamp) {
     refreshShop();
   }
 
+  if (game.state === GameState.CONTINUE_OFFER && !continueOpen) {
+    continueOpen = true;
+    hud.classList.add('hidden');
+    shopScreen.classList.add('hidden');
+    continueScreen.classList.remove('hidden');
+    document.getElementById('continueStats').innerHTML =
+      `第 <strong>${game.wave}</strong> 波倒下 · 击杀 <strong>${game.totalKills}</strong><br>接受诅咒：半血复活，敌人更快`;
+  }
+
   if (game.state === GameState.GAME_OVER && prevState !== GameState.GAME_OVER) {
     hud.classList.add('hidden');
+    continueScreen?.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
     document.getElementById('gameOverTitle').textContent = '游戏结束';
     document.getElementById('gameOverStats').innerHTML =
-      `存活到第 <strong>${game.wave}</strong> 波<br>击杀 <strong>${game.totalKills}</strong><br>材料 <strong>${game.player?.materials || 0}</strong>`;
+      `存活到第 <strong>${game.wave}</strong> 波<br>击杀 <strong>${game.totalKills}</strong><br>材料 <strong>${game.player?.materials || 0}</strong>`
+      + (game.cursedRun ? '<br>☠️ 曾以诅咒续命' : '');
   }
 
   if (game.state === GameState.VICTORY && prevState !== GameState.VICTORY) {
     hud.classList.add('hidden');
     shopScreen.classList.add('hidden');
+    continueScreen?.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
     document.getElementById('gameOverTitle').textContent = '胜利！';
     document.getElementById('gameOverStats').innerHTML =

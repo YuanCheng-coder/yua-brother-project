@@ -45,6 +45,11 @@ def main():
         ('kind: \'upgrade\'', 'js/shop.js'),
         ('drawTerrain', 'js/game.js'),
         ('getChapterForWave', 'js/game.js'),
+        ('lastStandHp', 'js/systems/tension.js'),
+        ('rageKillsNeeded', 'js/systems/tension.js'),
+        ('CONTINUE_OFFER', 'js/game.js'),
+        ('flashDeal', 'js/shop.js'),
+        ('grantPerfectDodge', 'js/entities.js'),
     ]
     for needle, path in checks:
         t = (ROOT / path).read_text(encoding='utf-8')

@@ -48,6 +48,16 @@
       <button id="nextWaveBtn" class="btn primary">开始下一波</button>
     </div>
 
+    <div id="continueScreen" class="screen hidden">
+      <h1>☠️ 诅咒续命？</h1>
+      <p class="desc">本局仅一次 · 以半血复活，但敌人移速 +20%</p>
+      <p id="continueStats"></p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button id="cursedContinueBtn" class="btn primary">接受诅咒 · 再战</button>
+        <button id="declineContinueBtn" class="btn secondary">认输</button>
+      </div>
+    </div>
+
     <div id="gameOverScreen" class="screen hidden">
       <h1 id="gameOverTitle">游戏结束</h1>
       <p id="gameOverStats"></p>
@@ -61,6 +71,8 @@
         <div class="hud-item">Wave <span id="hudWave">1</span>/<span id="hudMaxWaves">30</span></div>
         <div class="hud-item" id="hudChapter">Grove</div>
         <div class="hud-item"><span id="hudTimer">20</span>s</div>
+        <div class="hud-item" id="hudCombo">Combo —</div>
+        <div class="hud-item" id="hudRage"></div>
       </div>
       <div class="hud-weapons" id="hudWeapons"></div>
       <div class="wave-bar"><div id="waveProgress" class="wave-progress"></div></div>
