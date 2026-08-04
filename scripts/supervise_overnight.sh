@@ -35,9 +35,24 @@ ensure_iterate() {
     sleep 0.3
     export PYTHONIOENCODING=utf-8
     export PYTHONUTF8=1
-    nohup env PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python3 -u scripts/overnight_iterate.py >>"$LOG" 2>&1 &
-    echo $! > /tmp/yua-overnight.pid
-    log "overnight pid=$(cat /tmp/yua-overnight.pid)"
+    # Detach into new session so parent shell death cannot kill the iterator
+    python3 - <<'PY' >>"$LOG" 2>&1
+import os, subprocess
+env = os.environ.copy()
+env["PYTHONIOENCODING"] = "utf-8"
+env["PYTHONUTF8"] = "1"
+p = subprocess.Popen(
+    ["python3", "-u", "scripts/overnight_iterate.py"],
+    stdout=open("/tmp/yua-overnight.log", "a"),
+    stderr=subprocess.STDOUT,
+    start_new_session=True,
+    env=env,
+    cwd="/Users/yuancheng/yua-brother-project",
+)
+open("/tmp/yua-overnight.pid", "w").write(str(p.pid))
+print("overnight detached pid=", p.pid)
+PY
+    log "overnight pid=$(cat /tmp/yua-overnight.pid 2>/dev/null)"
   fi
 }
 
