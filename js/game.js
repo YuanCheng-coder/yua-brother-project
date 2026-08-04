@@ -60,6 +60,7 @@ export class Game {
     const amp = Math.min(10, 3.5 + hit.amount * 0.35);
     this.shake = Math.max(this.shake, amp);
     this.hurtVignette = Math.max(this.hurtVignette, 0.4);
+    this.impactZoom = Math.max(this.impactZoom || 0, 0.04);
     spawnBlood(this.particles, hit.x, hit.y, hit.amount);
   }
 
