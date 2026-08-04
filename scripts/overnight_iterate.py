@@ -254,25 +254,35 @@ def apply_patch(idx):
 
 
 def git_commit_push(ver, summary):
+    """Every version MUST be committed and pushed to GitHub."""
     run("git add -A")
     msg = "v{:03d}: {}".format(ver, summary)
-    r = run('git commit -m {}'.format(json.dumps(msg)))
-    if r.returncode != 0 and "nothing to commit" in (r.stdout + r.stderr):
+    r = run('git -c commit.gpgsign=false commit -m {}'.format(json.dumps(msg)))
+    print("COMMIT:", r.returncode, (r.stdout or "")[:200], (r.stderr or "")[:200])
+    if r.returncode != 0 and "nothing to commit" in ((r.stdout or "") + (r.stderr or "")):
         print("nothing to commit")
         return False
-    print(r.stdout)
-    # push with token via gh
+
     token = ""
     if GH.exists():
         tr = run("{} auth token".format(GH))
         token = (tr.stdout or "").strip()
-    if token:
-        url = "https://x-access-token:{}@github.com/YuanCheng-coder/yua-brother-project.git".format(token)
-        pr = run("git push {} HEAD:main".format(url))
-        print(pr.stdout, pr.stderr)
-    else:
-        pr = run("git push origin HEAD")
-        print(pr.stdout, pr.stderr)
+
+    pushed = False
+    for attempt in range(5):
+        if token:
+            url = "https://x-access-token:{}@github.com/YuanCheng-coder/yua-brother-project.git".format(token)
+            pr = run("GIT_TERMINAL_PROMPT=0 git push {} HEAD:main".format(url))
+        else:
+            pr = run("GIT_TERMINAL_PROMPT=0 git push origin HEAD:main")
+        out = ((pr.stdout or "") + (pr.stderr or "")).strip()
+        print("PUSH attempt", attempt + 1, "code", pr.returncode, out[:300])
+        if pr.returncode == 0 or "Everything up-to-date" in out or "-> main" in out:
+            pushed = True
+            break
+        time.sleep(8 + attempt * 4)
+    if not pushed:
+        print("ERROR: push failed after retries — will retry next cycle")
     return True
 
 
