@@ -216,9 +216,9 @@ export function waveIntensity(game) {
 
 export function drawTensionOverlays(ctx, game) {
   const intensity = waveIntensity(game);
-  if (intensity > 0.2 && (game.state === 'playing')) {
-    const pulse = 0.5 + 0.5 * Math.sin((game.time || 0) * (1.5 + intensity * 7));
-    const a = intensity * 0.45 * pulse;
+  if (intensity > 0.15 && (game.state === 'playing')) {
+    const pulse = 0.5 + 0.5 * Math.sin((game.time || 0) * (1.8 + intensity * 9));
+    const a = intensity * 0.55 * pulse;
     ctx.save();
     ctx.strokeStyle = `rgba(231,111,81,${a})`;
     ctx.lineWidth = 3 + intensity * 8;
