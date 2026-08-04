@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v024 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — mystery crate jackpot luck scales harder
+- mystery crate jackpot luck scales harder
+
 ## v023 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — elite portal more frequent midgame
 - elite portal more frequent midgame

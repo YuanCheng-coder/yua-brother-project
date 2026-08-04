@@ -186,8 +186,8 @@ export function updateCrates(game, dt) {
           const amt = Math.ceil((5 + game.wave) * (1 + luck));
           c.prize = { label: `💰 x${amt}` };
           game.materials.push(new Material(c.x, c.y, amt));
-        } else if (roll < 0.82) {
-          const amt = Math.ceil((12 + game.wave * 1.8) * (1 + luck));
+        } else if (roll < 0.78 + luck * 0.1) {
+          const amt = Math.ceil((14 + game.wave * 2.2) * (1 + luck));
           c.prize = { label: `✨ 大奖 ${amt}` };
           game.materials.push(new Material(c.x, c.y, amt));
           game.shake = Math.max(game.shake || 0, 6);
