@@ -381,7 +381,7 @@ export class Enemy {
     // 小 Boss / Boss 外圈光环
     if (this.type.isMiniBoss || this.type.isBoss) {
       ctx.strokeStyle = this.type.color;
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.35 + 0.2 * Math.abs(Math.sin(this.wobble));
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(this.x, this.y + bob, this.radius + 6, 0, Math.PI * 2);
