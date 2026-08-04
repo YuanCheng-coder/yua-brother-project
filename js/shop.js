@@ -82,6 +82,7 @@ export class Shop {
     deal.price = Math.max(1, Math.floor(deal.price * (1 - discount)));
     deal.flashDeal = true;
     deal.discountPct = Math.round(discount * 100);
+    deal.fomoSeconds = 45; // FOMO_SECONDS displayed urgency
     this.flashDeal = { key: deal.key, expiresWave: wave + 1, discountPct: deal.discountPct };
 
     // Locked tease of a higher-tier weapon the player can't buy yet
@@ -172,7 +173,7 @@ export function renderShopItems(container, shop, player, onBuy) {
   if (shop.flashDeal) {
     const banner = document.createElement('div');
     banner.className = 'fomo-banner';
-    banner.innerHTML = `⚡ 限时折扣 −${shop.flashDeal.discountPct}% · <strong>下一波失效</strong>`;
+    banner.innerHTML = `⚡ 限时折扣 −${shop.flashDeal.discountPct}% · <strong>下一波失效</strong> · 别犹豫`;
     container.appendChild(banner);
   }
 
