@@ -164,7 +164,8 @@ export function updatePortal(game, dt, spawnFn) {
       const ang = (Math.PI * 2 * i) / count;
       spawnFn(true, game.player.x + Math.cos(ang) * 100, game.player.y + Math.sin(ang) * 100);
     }
-    game.materials.push(new Material(p.x, p.y, 6 + game.wave));
+    game.materials.push(new Material(p.x, p.y, 10 + game.wave * 2));
+    game.materials.push(new Material(p.x + 20, p.y, 4 + Math.floor(game.wave / 2)));
   }
 }
 
