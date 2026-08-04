@@ -115,7 +115,7 @@ export function tickRage(game, dt) {
 
 export function maybeSpawnPortal(game) {
   if (game.wave < TENSION.portalMinWave || game.challengePortal || game.isBossWave) return;
-  if (Math.random() > 0.6) return;
+  if (Math.random() > (game.wave >= 8 ? 0.35 : 0.55)) return;
   const pad = ARENA_PADDING + 70;
   game.challengePortal = {
     x: pad + Math.random() * (CANVAS_WIDTH - pad * 2),
