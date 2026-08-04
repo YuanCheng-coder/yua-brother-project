@@ -40,12 +40,16 @@ document.getElementById('startBtn').addEventListener('click', () => {
   menuScreen.classList.add('hidden');
   hud.classList.remove('hidden');
   game.startSync(selectedChar);
+  canvas.focus();
 });
+
+canvas.addEventListener('pointerdown', () => canvas.focus());
 
 document.getElementById('nextWaveBtn').addEventListener('click', () => {
   shopScreen.classList.add('hidden');
   hud.classList.remove('hidden');
   shopOpen = false;
+  game.clearKeys();
   game.nextWave();
 });
 
@@ -102,7 +106,7 @@ function gameLoop(timestamp) {
   game.update(dt);
   game.draw();
 
-  if (game.state === GameState.PLAYING) {
+  if (game.state === GameState.PLAYING || game.state === GameState.COLLECTING) {
     updateHud();
   }
 

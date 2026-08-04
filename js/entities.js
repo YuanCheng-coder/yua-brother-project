@@ -1,4 +1,7 @@
-import { WEAPON_DEFS, getTierMultiplier, dist, clamp, ARENA_PADDING, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
+import {
+  WEAPON_DEFS, getTierMultiplier, dist, clamp, lerp,
+  ARENA_PADDING, CANVAS_WIDTH, CANVAS_HEIGHT, MATERIAL_MAGNET_RANGE,
+} from './constants.js';
 
 let nextId = 1;
 export function uid() { return nextId++; }
@@ -49,10 +52,12 @@ export class Player {
   }
 
   takeDamage(amount) {
-    if (this.invincible > 0) return;
+    if (this.invincible > 0) return 0;
     const reduced = Math.max(1, amount - this.armor * 0.5);
     this.hp -= reduced;
-    this.invincible = 0.3;
+    this.invincible = 0.35;
+    this.hitFeedback = { amount: reduced, x: this.x, y: this.y };
+    return reduced;
   }
 
   heal(amount) {
@@ -84,8 +89,7 @@ export class Player {
         this.heal(this.regen);
       }
     }
-
-    for (const w of this.weapons) w.update(dt, this);
+    // 武器开火只在 Game.update 里处理，避免重复调用导致攻击丢失
   }
 
   draw(ctx) {
@@ -141,14 +145,13 @@ export function createWeapon(weaponId, tier = 1) {
     get range() { return def.range * (1 + (tier - 1) * 0.1); },
     get cd() { return def.cooldown / mult; },
     update(dt, player) {
-      this.cooldown -= dt;
+      this.cooldown = Math.max(0, this.cooldown - dt);
       if (this.cooldown > 0) return null;
 
-      const target = findNearestEnemy(player);
-      if (!target) return null;
-
       const range = this.range * player.rangeMod;
-      if (dist(player.x, player.y, target.x, target.y) > range) return null;
+      // 优先攻击射程内最近敌人（计入敌人半径，避免“贴脸不打”）
+      const target = findNearestEnemyInRange(player, range);
+      if (!target) return null;
 
       this.cooldown = this.cd / player.attackSpeedMod;
       return fireWeapon(this, player, target);
@@ -159,15 +162,25 @@ export function createWeapon(weaponId, tier = 1) {
 let enemyListRef = null;
 export function setEnemyList(list) { enemyListRef = list; }
 
-function findNearestEnemy(player) {
+function findNearestEnemyInRange(player, range) {
   if (!enemyListRef) return null;
   let nearest = null, minDist = Infinity;
   for (const e of enemyListRef) {
     if (e.dead) continue;
-    const d = dist(player.x, player.y, e.x, e.y);
-    if (d < minDist) { minDist = d; nearest = e; }
+    const d = dist(player.x, player.y, e.x, e.y) - e.radius;
+    if (d <= range && d < minDist) {
+      minDist = d;
+      nearest = e;
+    }
   }
   return nearest;
+}
+
+export function angleDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return Math.abs(d);
 }
 
 function fireWeapon(weapon, player, target) {
@@ -175,7 +188,38 @@ function fireWeapon(weapon, player, target) {
   const dmgMod = def.type === 'melee' ? player.meleeDamageMod : player.rangedDamageMod;
   const damage = weapon.damage * player.damageMod * dmgMod;
   const angle = Math.atan2(target.y - player.y, target.x - player.x);
+  const targetDist = dist(player.x, player.y, target.x, target.y);
+  const touchDist = player.radius + target.radius + 10;
   const results = [];
+
+  // 贴身必中：子弹若从身前生成会直接越过敌人，导致“贴脸打不到”
+  if (targetDist <= touchDist) {
+    results.push({
+      type: 'pointblank',
+      x: target.x,
+      y: target.y,
+      damage: def.pellets ? damage * 1.2 : damage,
+      life: 0.05,
+      maxLife: 0.05,
+      color: '#f4a261',
+      target,
+      hitEnemies: new Set(),
+    });
+    if (def.type === 'melee') {
+      results.push({
+        type: 'melee',
+        x: player.x, y: player.y,
+        angle, range: weapon.range * player.rangeMod,
+        damage: 0, // 伤害已由 pointblank 结算
+        sweep: true, // 贴身挥砍用大角度，方便打到周围贴脸怪
+        pointBlank: true,
+        life: 0.1, maxLife: 0.1,
+        color: '#f4a261',
+        hitEnemies: new Set([target]),
+      });
+    }
+    return results;
+  }
 
   if (def.type === 'melee') {
     results.push({
@@ -183,8 +227,9 @@ function fireWeapon(weapon, player, target) {
       x: player.x, y: player.y,
       angle, range: weapon.range * player.rangeMod,
       damage, sweep: def.sweep,
-      life: 0.15, maxLife: 0.15,
+      life: 0.12, maxLife: 0.12,
       color: '#f4a261',
+      hitEnemies: new Set(),
     });
   } else if (def.pellets) {
     for (let i = 0; i < def.pellets; i++) {
@@ -198,18 +243,22 @@ function fireWeapon(weapon, player, target) {
 }
 
 function createProjectile(player, angle, damage, def, weapon) {
+  const travelRange = weapon.range * player.rangeMod;
+  const life = travelRange / def.projectileSpeed;
+  // 贴身生成偏移要小，避免出生点落在敌人外侧
+  const muzzle = 8;
   return {
     type: 'projectile',
-    x: player.x + Math.cos(angle) * 25,
-    y: player.y + Math.sin(angle) * 25,
+    x: player.x + Math.cos(angle) * muzzle,
+    y: player.y + Math.sin(angle) * muzzle,
     vx: Math.cos(angle) * def.projectileSpeed,
     vy: Math.sin(angle) * def.projectileSpeed,
     damage,
     pierce: def.pierce || 0,
     homing: def.homing || false,
-    life: def.range / def.projectileSpeed + 0.5,
-    maxLife: def.range / def.projectileSpeed + 0.5,
-    radius: 4,
+    life,
+    maxLife: life,
+    radius: def.id === 'sniper' ? 5 : 4,
     color: weapon.tier >= 3 ? '#60a5fa' : weapon.tier >= 2 ? '#4ade80' : '#f4a261',
     hitEnemies: new Set(),
   };
@@ -222,26 +271,66 @@ export class Enemy {
     this.y = y;
     this.dead = false;
     const scale = 1 + (wave - 1) * 0.12;
-    this.maxHp = Math.floor(type.baseHp * scale);
+    const eliteMult = type.isMiniBoss ? 1.15 : type.isBoss ? 1.25 : 1;
+    this.maxHp = Math.floor(type.baseHp * scale * eliteMult);
     this.hp = this.maxHp;
-    this.speed = type.speed * (1 + (wave - 1) * 0.03);
+    // 波次加速封顶，避免后期快到无法走位
+    this.speed = type.speed * (1 + Math.min(wave - 1, 12) * 0.018);
     this.damage = Math.floor(type.damage * (1 + (wave - 1) * 0.08));
-    this.radius = type.isBoss ? 35 : 14;
+    this.radius = type.radius || (type.isBoss ? 36 : type.isMiniBoss ? 28 : 14);
     this.hitFlash = 0;
     this.wobble = Math.random() * Math.PI * 2;
+    this.shootCd = 0.4 + Math.random() * 0.8;
   }
 
+  /** @returns {Array} 本帧射出的敌方子弹 */
   update(dt, player) {
-    if (this.dead) return;
-    const angle = Math.atan2(player.y - this.y, player.x - this.x);
-    this.x += Math.cos(angle) * this.speed * dt;
-    this.y += Math.sin(angle) * this.speed * dt;
-    this.wobble += dt * 3;
+    const shots = [];
+    if (this.dead) return shots;
 
-    if (dist(this.x, this.y, player.x, player.y) < this.radius + player.radius) {
+    const d = dist(this.x, this.y, player.x, player.y);
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    this.wobble += dt * (this.type.role === 'fast' ? 5 : 3);
+
+    // 移动：远程怪保持距离，其余追击
+    let moveAngle = angle;
+    let moveSpeed = this.speed;
+    if (this.type.keepDistance) {
+      const ideal = this.type.keepDistance;
+      if (d < ideal - 30) {
+        moveAngle = angle + Math.PI; // 后退
+        moveSpeed = this.speed * 0.9;
+      } else if (d > ideal + 40) {
+        moveAngle = angle;
+        moveSpeed = this.speed;
+      } else {
+        // 侧向游走，避免站桩
+        moveAngle = angle + Math.PI / 2 * (Math.sin(this.wobble) > 0 ? 1 : -1);
+        moveSpeed = this.speed * 0.55;
+      }
+    }
+
+    this.x += Math.cos(moveAngle) * moveSpeed * dt;
+    this.y += Math.sin(moveAngle) * moveSpeed * dt;
+    this.x = clamp(this.x, ARENA_PADDING + this.radius, CANVAS_WIDTH - ARENA_PADDING - this.radius);
+    this.y = clamp(this.y, ARENA_PADDING + this.radius, CANVAS_HEIGHT - ARENA_PADDING - this.radius);
+
+    // 远程开火
+    if (this.type.ranged) {
+      this.shootCd -= dt;
+      const rd = this.type.ranged;
+      if (this.shootCd <= 0 && d <= rd.range && d > this.radius + player.radius) {
+        this.shootCd = rd.cooldown * (0.85 + Math.random() * 0.3);
+        shots.push(createEnemyProjectile(this, player, rd));
+      }
+    }
+
+    // 接触伤害
+    if (d < this.radius + player.radius) {
       player.takeDamage(this.damage);
     }
     if (this.hitFlash > 0) this.hitFlash -= dt;
+    return shots;
   }
 
   takeDamage(amount) {
@@ -260,21 +349,50 @@ export class Enemy {
     if (this.hitFlash > 0) ctx.filter = 'brightness(2)';
 
     const bob = Math.sin(this.wobble) * 2;
-    ctx.font = `${this.radius * 1.6}px serif`;
+
+    // 小 Boss / Boss 外圈光环
+    if (this.type.isMiniBoss || this.type.isBoss) {
+      ctx.strokeStyle = this.type.color;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y + bob, this.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.font = `${this.radius * 1.55}px serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(this.type.emoji, this.x, this.y + bob);
 
-    // HP bar
-    if (this.hp < this.maxHp) {
-      const barW = this.radius * 2;
+    // 血条：精英怪始终显示
+    if (this.hp < this.maxHp || this.type.isMiniBoss || this.type.isBoss) {
+      const barW = Math.max(this.radius * 2, 28);
       ctx.fillStyle = '#333';
-      ctx.fillRect(this.x - barW / 2, this.y - this.radius - 10, barW, 4);
+      ctx.fillRect(this.x - barW / 2, this.y - this.radius - 12, barW, 4);
       ctx.fillStyle = this.type.color;
-      ctx.fillRect(this.x - barW / 2, this.y - this.radius - 10, barW * (this.hp / this.maxHp), 4);
+      ctx.fillRect(this.x - barW / 2, this.y - this.radius - 12, barW * (this.hp / this.maxHp), 4);
     }
     ctx.restore();
   }
+}
+
+function createEnemyProjectile(enemy, player, rd) {
+  const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const life = rd.range / rd.projectileSpeed;
+  return {
+    type: 'enemy',
+    x: enemy.x + Math.cos(angle) * (enemy.radius + 4),
+    y: enemy.y + Math.sin(angle) * (enemy.radius + 4),
+    vx: Math.cos(angle) * rd.projectileSpeed,
+    vy: Math.sin(angle) * rd.projectileSpeed,
+    damage: rd.damage,
+    life,
+    maxLife: life,
+    radius: enemy.type.isBoss ? 7 : 5,
+    color: rd.color || '#f87171',
+  };
 }
 
 export class Material {
@@ -282,23 +400,30 @@ export class Material {
     this.x = x;
     this.y = y;
     this.amount = amount;
-    this.life = 8;
+    this.life = 12;
     this.collected = false;
-    this.magnetRange = 80;
-    this.magnetSpeed = 300;
+    this.magnetRange = MATERIAL_MAGNET_RANGE;
+    this.vacuum = false; // 波次结束全图吸附
   }
 
   update(dt, player) {
     if (this.collected) return;
-    this.life -= dt;
+    if (!this.vacuum) this.life -= dt;
     const d = dist(this.x, this.y, player.x, player.y);
-    if (d < this.magnetRange || d < 30) {
+
+    // 普通：一定距离吸附；收钱阶段：全图吸向角色
+    const range = this.vacuum ? 9999 : this.magnetRange;
+    if (d < range) {
       const angle = Math.atan2(player.y - this.y, player.x - this.x);
-      const speed = d < 30 ? 600 : this.magnetSpeed;
+      const t = this.vacuum ? Math.min(1, 1 - d / 500) : (1 - d / this.magnetRange);
+      const speed = this.vacuum
+        ? lerp(420, 1100, Math.max(0, t))
+        : lerp(280, 900, Math.max(0, t) ** 2);
       this.x += Math.cos(angle) * speed * dt;
       this.y += Math.sin(angle) * speed * dt;
     }
-    if (d < player.radius + 10) {
+
+    if (d < player.radius + 18) {
       this.collected = true;
       player.materials += this.amount;
     }
@@ -310,31 +435,35 @@ export class Material {
     ctx.globalAlpha = Math.min(1, this.life);
     ctx.font = '16px serif';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText('💰', this.x, this.y);
     ctx.restore();
   }
 }
 
 export class Particle {
-  constructor(x, y, color, vx, vy, life) {
+  constructor(x, y, color, vx, vy, life, opts = {}) {
     this.x = x; this.y = y;
     this.vx = vx; this.vy = vy;
     this.life = life; this.maxLife = life;
     this.color = color;
-    this.radius = 2 + Math.random() * 3;
+    this.radius = opts.radius ?? (2 + Math.random() * 3);
+    this.gravity = opts.gravity ?? 0;
+    this.drag = opts.drag ?? 0.95;
   }
 
   update(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+    this.vy += this.gravity * dt;
     this.life -= dt;
-    this.vx *= 0.95;
-    this.vy *= 0.95;
+    this.vx *= this.drag;
+    this.vy *= this.drag;
   }
 
   draw(ctx) {
     ctx.save();
-    ctx.globalAlpha = this.life / this.maxLife;
+    ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
     ctx.fillStyle = this.color;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -348,5 +477,24 @@ export function spawnParticles(list, x, y, color, count = 8) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 50 + Math.random() * 150;
     list.push(new Particle(x, y, color, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.3));
+  }
+}
+
+/** 受击流血粒子 */
+export function spawnBlood(list, x, y, amount = 1) {
+  const count = Math.min(14, 8 + Math.floor(amount * 0.4));
+  const colors = ['#ef4444', '#dc2626', '#b91c1c', '#f87171'];
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI; // 偏上溅射
+    const speed = 60 + Math.random() * 180;
+    list.push(new Particle(
+      x + (Math.random() - 0.5) * 10,
+      y + (Math.random() - 0.5) * 10,
+      colors[Math.floor(Math.random() * colors.length)],
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      0.35 + Math.random() * 0.45,
+      { radius: 1.5 + Math.random() * 3.5, gravity: 280, drag: 0.92 }
+    ));
   }
 }

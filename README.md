@@ -20,19 +20,30 @@
 | 🎯 射手土豆 | 远程伤害、射程 |
 | ⚡ 疾风土豆 | 高移速、攻速 |
 
-## 武器
+## 敌人类型
 
-| 类型 | 武器 |
-|------|------|
-| 远程 | 🔫 手枪 · 冲锋枪 · 💥 霰弹枪 · ✨ 激光 · 🪄 魔杖 |
-| 近战 | 🔪 短刀 · 🪓 战斧 · 🗡️ 长矛 |
+| 类型 | 示例 | 特点 |
+|------|------|------|
+| 普通 | 👾 僵尸 | 均衡属性 |
+| 速度型 | 🦇 🕷️ | 血薄、追得快 |
+| 坦克 | 💀 🪨 | 血厚、移动慢 |
+| 远程 | 🧙 👁️ | 保持距离、发射子弹 |
+| 小 Boss | 😈 | 高血量，能远程攻击（第 5/9/13/17 波等） |
+| 最终 Boss | 👹 | 第 20 波 |
+
+## 武器与射程
+
+| 类型 | 武器 | 射程 |
+|------|------|------|
+| 近战（近→远） | 🔪 短刀 → 🪓 战斧 → 🗡️ 长矛 | 52 / 78 / 115 |
+| 枪械（近→远） | 💥 霰弹 → 冲锋枪 → 手枪 → 🪄 魔杖 → ✨ 激光 → 🎯 狙击 | 170 → 520 |
 
 ## 快速开始
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YuanCheng-coder/new-project.git
-cd new-project
+git clone https://github.com/YuanCheng-coder/yua-brother-project.git
+cd yua-brother-project
 
 # 启动本地服务器（需要 Python 3）
 python3 -m http.server 8080
@@ -52,7 +63,7 @@ open http://localhost:8080
 ## 项目结构
 
 ```
-new-project/
+yua-brother-project/
 ├── index.html          # 游戏入口
 ├── css/style.css       # UI 样式
 ├── js/

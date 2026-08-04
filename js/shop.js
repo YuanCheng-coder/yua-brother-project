@@ -105,7 +105,8 @@ export function renderShopItems(container, shop, player, onBuy) {
       const def = WEAPON_DEFS[item.weaponId];
       emoji = def.emoji;
       name = `${def.name} T${item.tier}`;
-      desc = def.desc;
+      const rangeLabel = def.type === 'melee' ? '近战' : '远程';
+      desc = `${def.desc} · ${rangeLabel}射程 ${def.range}`;
     } else {
       emoji = item.upgrade.emoji;
       name = item.upgrade.name;
@@ -138,7 +139,7 @@ export function renderWeaponSlots(container, player) {
     el.className = 'weapon-slot';
     el.innerHTML = `
       <span>${w.def.emoji} ${w.def.name} <span class="tier-${w.tier}">T${w.tier}</span></span>
-      <span style="color:#888">${Math.floor(w.damage)} dmg</span>
+      <span style="color:#888">${Math.floor(w.damage)}伤 · 射程${Math.floor(w.range)}</span>
     `;
     container.appendChild(el);
   }
