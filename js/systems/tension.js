@@ -6,8 +6,8 @@ import { Material, spawnParticles } from '../entities.js';
 
 export const TENSION = {
   lastStandHp: 0.25,
-  lastStandSlow: 0.5,
-  lastStandDmg: 1.4,
+  lastStandSlow: 0.42,
+  lastStandDmg: 1.55,
   rageKillsNeeded: 12,
   rageWindow: 7,
   rageDuration: 7,
