@@ -268,6 +268,9 @@ def git_commit_push(ver, summary):
         tr = run("{} auth token".format(GH))
         token = (tr.stdout or "").strip()
 
+    # sync remote before push to avoid race with supervisor
+    run("GIT_TERMINAL_PROMPT=0 git fetch origin")
+    run("GIT_TERMINAL_PROMPT=0 git pull --rebase origin main || true")
     pushed = False
     for attempt in range(5):
         if token:

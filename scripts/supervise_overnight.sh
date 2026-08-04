@@ -13,13 +13,6 @@ ensure_http() {
   fi
 }
 
-push_all() {
-  TOKEN=$("$HOME/.local/bin/gh" auth token 2>/dev/null || true)
-  if [ -n "$TOKEN" ]; then
-    GIT_TERMINAL_PROMPT=0 git push "https://x-access-token:${TOKEN}@github.com/YuanCheng-coder/yua-brother-project.git" HEAD:main >>"$LOG" 2>&1 || true
-  fi
-}
-
 while true; do
   NOW=$(date "+%s")
   [ "$NOW" -ge "$DEADLINE" ] && echo "$(date) deadline" >>"$LOG" && break
@@ -31,6 +24,5 @@ while true; do
     nohup python3 -u scripts/overnight_iterate.py >>"$LOG" 2>&1 &
     echo $! > /tmp/yua-overnight.pid
   fi
-  push_all
   sleep 45
 done
