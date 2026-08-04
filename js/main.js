@@ -51,6 +51,11 @@ document.getElementById('nextWaveBtn').addEventListener('click', () => {
   hud.classList.remove('hidden');
   shopOpen = false;
   game.clearKeys();
+  // Temptation: risk bonus wave offer every 5 waves
+  if (game.wave % 5 === 0 && game.wave < MAX_WAVES - 1 && !game._skippedTempt) {
+    const go = confirm('🔥 再来一波风险波？材料 x1.5，敌人更密。取消=正常下一波');
+    if (go) { game.riskWave = true; game.player.materialGain = (game.player.materialGain || 1) * 1.5; }
+  }
   game.nextWave();
 });
 
