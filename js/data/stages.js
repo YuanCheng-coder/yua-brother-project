@@ -64,7 +64,7 @@ export function getWaveDuration(wave) {
 
 export function getWaveSpawnRate(wave) {
   // 缓慢增加密度，前几波友好
-  const base = 1.1 + wave * 0.2;
+  const base = 1.05 + wave * 0.18;
   return Math.min(base, 5.5);
 }
 
