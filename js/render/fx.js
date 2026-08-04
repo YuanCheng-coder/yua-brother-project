@@ -60,3 +60,4 @@ export function drawMuzzleFlash(ctx, x, y, angle, life) {
   ctx.fill();
   ctx.restore();
 }
+// auto-v65068 camera impact zoom on hit
