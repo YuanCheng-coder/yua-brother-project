@@ -62,3 +62,4 @@ export function drawMuzzleFlash(ctx, x, y, angle, life) {
 }
 // auto-v65068 camera impact zoom on hit
 // auto-v65210 camera impact zoom on hit
+// auto-v65248 camera impact zoom on hit
