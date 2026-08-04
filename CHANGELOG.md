@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v031 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — rage mode lifestream sustain for power fantasy
+- rage mode lifestream sustain for power fantasy
+
 ## v030 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — challenge beacon bonus loot pile on entry
 - challenge beacon bonus loot pile on entry

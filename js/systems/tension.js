@@ -100,6 +100,9 @@ export function onEnemyKilled(game, enemy) {
 }
 
 export function tickRage(game, dt) {
+  if ((game.rageTimer || 0) > 0 && game.player) {
+    game.player.hp = Math.min(game.player.maxHp, game.player.hp + 2.5 * dt);
+  }
   if ((game.rageTimer || 0) > 0) {
     game.rageTimer -= dt;
     if (game.player) {
