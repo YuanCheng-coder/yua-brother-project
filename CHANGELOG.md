@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v017 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — daily run streak bonus materials on start
+- daily run streak bonus materials on start
+
 ## v016 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — 近死慢动作 Last Stand、连击材料倍率、15杀狂暴、神秘宝箱、精英挑战信标、商店限时折扣、Boss预警爆炸、诅咒续命、波次强度脉冲、完美闪避
 - Wired js/systems/tension.js into game/entities/shop/main/HUD
