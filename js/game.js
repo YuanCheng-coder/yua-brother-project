@@ -154,6 +154,7 @@ export class Game {
       this._spawnEnemy(false, true);
     }
     setEnemyList(this.enemies);
+    this.chapterBanner = 2.2;
   }
 
   _aliveCount() {

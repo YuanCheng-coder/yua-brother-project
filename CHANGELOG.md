@@ -2,6 +2,9 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v011 (2026-08-05)
+- chapter banner on wave start
+
 ## v010 (2026-08-05)
 - muzzle flash trail on shots
 
