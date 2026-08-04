@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nightly auto-iteration for Yua Brother — ADDICTION FEATURES ONLY.
+Nightly auto-iteration for Yua Brother - ADDICTION FEATURES ONLY.
 Every cycle MUST answer: 「还有没有新特性让人上瘾？」with a concrete feature.
 Polish-only / comment bumps are REJECTED.
 """
@@ -20,7 +20,7 @@ POLISH_BAN = re.compile(
     re.I,
 )
 
-# Meaty feature injections — each ships a real addictive loop change.
+# Meaty feature injections - each ships a real addictive loop change.
 # Format: (summary, rel_path, old, new) OR ("GEN", feature_id, callable)
 FEATURES = [
     (
@@ -28,7 +28,7 @@ FEATURES = [
         "js/game.js",
         "this.state = GameState.PLAYING;\n    this._startWave();\n  }",
         "this.state = GameState.PLAYING;\n"
-        "    // Daily streak: consecutive calendar days → starting materials\n"
+        "    // Daily streak: consecutive calendar days -> starting materials\n"
         "    try {\n"
         "      const key = 'yua_daily_streak';\n"
         "      const today = new Date().toISOString().slice(0, 10);\n"
@@ -268,7 +268,7 @@ def bump(summary):
     (ROOT / "VERSION.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     log = ROOT / "CHANGELOG.md"
     qna = (
-        "Q: 还有没有新特性让人上瘾？ A: YES — {}\n".format(summary)
+        "Q: 还有没有新特性让人上瘾？ A: YES - {}\n".format(summary)
     )
     entry = "\n## v{:03d} ({})\n- {}\n- {}\n".format(
         data["version"], data["updatedAt"][:10], qna.strip(), summary
@@ -350,7 +350,7 @@ def _gen_rage_heal_tick(ver):
     if marker in t:
         insert = (
             "export function tickRage(game, dt) {\n"
-            "  // Rage heals a trickle — power fantasy sustain\n"
+            "  // Rage heals a trickle - power fantasy sustain\n"
             "  if ((game.rageTimer || 0) > 0 && game.player) {\n"
             "    game.player.hp = Math.min(game.player.maxHp, game.player.hp + 2.5 * dt);\n"
             "  }"
@@ -390,7 +390,7 @@ def _gen_combo_speed_rush(ver):
         return None
     new = (
         "export function onEnemyKilled(game, enemy) {\n"
-        "  // High combo = move faster — chase the next kill\n"
+        "  // High combo = move faster - chase the next kill\n"
         "  if (game.player && (game.combo || 0) >= 6) {\n"
         "    game.player.comboSpeedRush = 1.12;\n"
         "  }"
@@ -412,7 +412,7 @@ def _gen_portal_heal_on_clear(ver):
     if "challengeHealOnClear" in t:
         return None
     old = "this.challengeActive = false;"
-    # too common — use specific
+    # too common - use specific
     old = "this.challengePortal = null;\n    this.challengeActive = false;\n    this.portalBanner = 0;"
     if old not in t:
         return None
@@ -428,7 +428,7 @@ def _gen_portal_heal_on_clear(ver):
     )
     if old2 in t:
         path.write_text(t.replace(old2, new2, 1), encoding="utf-8")
-        return "elite challenge kill heals — risk pays off"
+        return "elite challenge kill heals - risk pays off"
     return None
 
 
@@ -486,13 +486,13 @@ def git_commit_push(ver, summary):
         time.sleep(6 + attempt * 3)
         run("GIT_TERMINAL_PROMPT=0 git pull --rebase origin main || true")
     if not pushed:
-        print("ERROR: push failed after retries — will retry next cycle")
+        print("ERROR: push failed after retries - will retry next cycle")
     return True
 
 
 def main():
     os.chdir(str(ROOT))
-    # Kill any leftover polish mode state — feature queue starts fresh-ish
+    # Kill any leftover polish mode state - feature queue starts fresh-ish
     ensure_server()
     i = 0
     while True:

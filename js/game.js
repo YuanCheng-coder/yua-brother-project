@@ -182,8 +182,9 @@ export class Game {
     this.continueUsed = true;
     this.cursedRun = true;
     this.enemySpeedCurse = 1.2;
-    this.player.hp = Math.max(1, Math.floor(this.player.maxHp * 0.5));
-    this.player.invincible = 1.5;
+    this.player.hp = Math.max(1, Math.floor(this.player.maxHp * 0.55));
+    this.player.invincible = 2.0;
+    this.player.damageMod = (this.player.damageMod || 1) * 1.1;
     this.enemies = [];
     this.enemyProjectiles = [];
     this.projectiles = [];
