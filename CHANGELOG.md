@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v025 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — shop flash deal steeper FOMO discount
+- shop flash deal steeper FOMO discount
+
 ## v024 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — mystery crate jackpot luck scales harder
 - mystery crate jackpot luck scales harder

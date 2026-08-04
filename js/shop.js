@@ -77,7 +77,7 @@ export class Shop {
 
     const idx = Math.floor(Math.random() * this.items.length);
     const deal = this.items[idx];
-    const discount = 0.35 + Math.random() * 0.15;
+    const discount = 0.4 + Math.random() * 0.2;
     deal.basePrice = deal.price;
     deal.price = Math.max(1, Math.floor(deal.price * (1 - discount)));
     deal.flashDeal = true;
