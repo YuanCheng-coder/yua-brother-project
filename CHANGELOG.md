@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v028 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — hitstop on combo milestones for juice
+- hitstop on combo milestones for juice
+
 ## v027 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — perfect dodge i-frames longer reward skill
 - perfect dodge i-frames longer reward skill

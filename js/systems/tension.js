@@ -86,6 +86,10 @@ export function onEnemyKilled(game, enemy) {
   } else if ((game.combo || 0) >= 5) {
     game.shake = Math.max(game.shake || 0, 2 + Math.min(5, game.combo * 0.12));
   }
+  if (game.combo === 8 || game.combo === 12 || game.combo === 20) {
+    game.hitstop = Math.max(game.hitstop || 0, 0.06);
+    game.shake = Math.max(game.shake || 0, 7);
+  }
 
   const tier = comboTier(game.combo);
   const rageBonus = (game.rageTimer || 0) > 0 ? 1.25 : 1;
