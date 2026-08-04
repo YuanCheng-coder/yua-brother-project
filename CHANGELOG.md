@@ -2,6 +2,10 @@
 
 目标：今天 22:00 前迭代至 **v100**。全自动夜间迭代，无需人工介入。
 
+## v020 (2026-08-05)
+- Q: 还有没有新特性让人上瘾？ A: YES — combo x3 threshold earlier for juice
+- combo x3 threshold earlier for juice
+
 ## v019 (2026-08-05)
 - Q: 还有没有新特性让人上瘾？ A: YES — risk wave denser spawns when tempted
 - risk wave denser spawns when tempted

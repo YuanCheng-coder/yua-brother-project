@@ -22,8 +22,8 @@ export const TENSION = {
 };
 
 export function comboTier(combo = 0) {
-  if (combo >= 15) return { mult: 3, label: 'x3' };
-  if (combo >= 8) return { mult: 2, label: 'x2' };
+  if (combo >= 12) return { mult: 3, label: 'x3' };
+  if (combo >= 6) return { mult: 2, label: 'x2' };
   if (combo >= 3) return { mult: 1.5, label: 'x1.5' };
   return { mult: 1, label: 'x1' };
 }
