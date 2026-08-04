@@ -209,8 +209,9 @@ export class Game {
     this.waveTimer = this.waveDuration;
     this.enemiesSpawned = 0;
     this.spawnTimer = 0.4;
-    this.spawnRate = getWaveSpawnRate(this.wave);
-    this.maxAlive = getWaveMaxAlive(this.wave);
+    this.spawnRate = getWaveSpawnRate(this.wave) * (this.riskWave ? 1.45 : 1);
+    this.maxAlive = Math.floor(getWaveMaxAlive(this.wave) * (this.riskWave ? 1.35 : 1));
+    this.riskWave = false;
     this.waveEnded = false;
     this.isBossWave = this.wave === MAX_WAVES || this.wave === 20 || this.wave === 10;
     this.miniBossSpawnedThisWave = 0;
