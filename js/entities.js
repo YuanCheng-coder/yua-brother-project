@@ -383,8 +383,8 @@ export class Enemy {
       if (this.shootCd <= 0 && d <= rd.range && d > this.radius + player.radius) {
         if (isTelegraphBoss && this.telegraph <= 0 && !this._windup) {
           this._windup = true;
-          this.telegraph = 0.55;
-          this.shootCd = 0.55;
+          this.telegraph = 0.7;
+          this.shootCd = 0.7;
         } else {
           this._windup = false;
           this.shootCd = rd.cooldown * (0.85 + Math.random() * 0.3);
