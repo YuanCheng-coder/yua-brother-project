@@ -70,6 +70,10 @@ export function registerKillForRage(game) {
 }
 
 export function onEnemyKilled(game, enemy) {
+  // High combo = move faster — chase the next kill
+  if (game.player && (game.combo || 0) >= 6) {
+    game.player.comboSpeedRush = 1.12;
+  }
   game.combo = (game.combo || 0) + 1;
   game.comboTimer = 2.8;
   game.comboPeak = Math.max(game.comboPeak || 0, game.combo);

@@ -33,7 +33,9 @@ ensure_iterate() {
     # Prevent duplicate zombies
     pkill -f "scripts/overnight_iterate.py" 2>/dev/null || true
     sleep 0.3
-    nohup python3 -u scripts/overnight_iterate.py >>"$LOG" 2>&1 &
+    export PYTHONIOENCODING=utf-8
+    export PYTHONUTF8=1
+    nohup env PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python3 -u scripts/overnight_iterate.py >>"$LOG" 2>&1 &
     echo $! > /tmp/yua-overnight.pid
     log "overnight pid=$(cat /tmp/yua-overnight.pid)"
   fi

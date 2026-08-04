@@ -50,7 +50,7 @@ export class Player {
   }
 
   get speed() {
-    return this.baseSpeed * this.speedMod * (this.terrainSpeed || 1) * (this.speedModRage || 1);
+    return this.baseSpeed * this.speedMod * (this.terrainSpeed || 1) * (this.speedModRage || 1) * (this.comboSpeedRush || 1);
   }
 
   addWeapon(weaponId, tier = 1) {

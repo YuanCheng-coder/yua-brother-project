@@ -502,7 +502,7 @@ def main():
             print("STOP", now, "version", ver)
             break
 
-        print("CHECKLIST: 还有没有新特性让人上瘾？ → MUST ship real feature")
+        print("CHECKLIST: addiction feature required this cycle")
         summary = apply_feature(i)
         i += 1
         if POLISH_BAN.search(summary or ""):
